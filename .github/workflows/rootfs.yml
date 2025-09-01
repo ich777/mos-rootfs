@@ -150,7 +150,7 @@ jobs:
             --header "Authorization: Bearer ${{ secrets.MOS_TOKEN }}" \
             --header "X-GitHub-Api-Version: 2022-11-28")
 
-        # Define QEMU_VERSION
+        # Define SNAPRAID_VERSION
         if [ ! -z "${{ github.event.inputs.snapraid_version }}" ] ; then
           SNAPRAID_VERSION=${{ github.event.inputs.snapraid_version }}
         else
@@ -161,6 +161,23 @@ jobs:
         SNAPRAID_DEB=$(echo $SNAPRAID_JSON | jq --arg version v${SNAPRAID_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-snapraid") and endswith(".deb")) | .id')
         SNAPRAID_DEB_MD5=$(echo $SNAPRAID_JSON | jq --arg version v${SNAPRAID_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-snapraid") and endswith(".deb.md5")) | .id')
 
+        # Get MergerFS Releases
+        MERGERFS_JSON=$(curl -s --request GET \
+            --url "https://api.github.com/repos/ich777/mos-mergerfs/releases?per_page=50" \
+            --header "Authorization: Bearer ${{ secrets.MOS_TOKEN }}" \
+            --header "X-GitHub-Api-Version: 2022-11-28")
+
+        # Define MERGERFS_VERSION
+        if [ ! -z "${{ github.event.inputs.mergerfs_version }}" ] ; then
+          MERGERFS_VERSION=${{ github.event.inputs.mergerfs_version }}
+        else
+          MERGERFS_VERSION=$(echo $SNAPRAID_JSON | jq -r '.[].tag_name' | sort -V | tail -1)
+        fi
+
+        # Get Asset IDs
+        MERGERFS_DEB=$(echo $MERGERFS_JSON | jq --arg version v${MERGERFS_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-mergerfs") and endswith(".deb")) | .id')
+        MERGERFS_DEB_MD5=$(echo $MERGERFS_JSON | jq --arg version v${MERGERFS_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-mergerfs") and endswith(".deb.md5")) | .id')
+
         # Download applications
         application_download "docker" "${DOCKER_VERSION#v}" "$DOCKER_DEB"
         application_download "docker" "${DOCKER_VERSION#v}" "$DOCKER_DEB_MD5" ".md5"
@@ -170,14 +187,8 @@ jobs:
         application_download "qemu" "${QEMU_VERSION#v}" "$QEMU_DEB_MD5" ".md5"
         application_download "snapraid" "${SNAPRAID_VERSION#v}" "$SNAPRAID_DEB"
         application_download "snapraid" "${SNAPRAID_VERSION#v}" "$SNAPRAID_DEB_MD5" ".md5"
-
-        # Download MergerFS
-        if [ ! -z "${{ github.event.inputs.mergerfs_version }}" ] ; then
-          MERGERFS_V=${{ github.event.inputs.mergerfs_version }}
-        else
-          MERGERFS_V=$(curl -u ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} -s https://api.github.com/repos/trapexit/mergerfs/releases/latest | jq -r '.tag_name')
-        fi
-        wget -O ${{ github.workspace }}/rootfs/tmp/applications/mergerfs-v$MERGERFS_V.tar.gz https://github.com/trapexit/mergerfs/releases/download/$MERGERFS_V/mergerfs-static-linux_amd64.tar.gz
+        application_download "mergerfs" "${MERGERFS_VERSION#v}" "$MERGERFS_DEB"
+        application_download "mergerfs" "${MERGERFS_VERSION#v}" "$MERGERFS_DEB_MD5" ".md5"
 
     - name: Modify rootfs
       run: |
