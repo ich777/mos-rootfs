@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# OS-Informationen sammeln
+os_info=$(cat $ROOTFS/etc/os-release | jq -R 'split("=") | {(.[0]): (.[1] | gsub("\""; ""))}' | jq -s 'add')
+
+# Package-Informationen sammeln
+packages=$(chroot $ROOTFS dpkg-query -l | awk '$1 == "ii" {print $2, $3}' | jq -R 'split(" ") | {name: .[0], version: .[1]}' | jq -s .)
+
+# Alles zusammenführen
+jq -n \
+  --argjson os_info "$os_info" \
+  --argjson packages "$packages" \
+  --arg channel "$1" \
+  --arg version "$2" \
+  --arg recommended_kernel "$3" \
+  '{
+    mos: {
+      version: $version,
+      build: (now | strftime("%Y%m%d-%H%M")),
+      recommended_kernel: $recommended_kernel,
+      channel: $channel
+    },
+    base: [{
+      os_name: $os_info.NAME,
+      os_version: $os_info.VERSION,
+      os_id: $os_info.ID,
+      os_version_id: $os_info.VERSION_ID,
+      packages: $packages
+    }]
+  }'
