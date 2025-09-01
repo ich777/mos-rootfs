@@ -86,7 +86,7 @@ jobs:
               --output "${{ github.workspace }}/rootfs/tmp/applications/mos-$1_$2_amd64.deb$4" \
               "https://api.github.com/repos/ich777/mos-$REPO/releases/assets/$3"
           if [ "$4" == ".md5" ] ; then
-            if [ "$(md5sum ${{ github.workspace }}/rootfs/tmp/applications/mos-$1_$2_amd64.deb | awk '{print $2}')" != "$(cat ${{ github.workspace }}/rootfs/tmp/applications/mos-$1_$2_amd64.deb$4)" ] ; then
+            if [ "$(md5sum ${{ github.workspace }}/rootfs/tmp/applications/mos-$1_$2_amd64.deb | awk '{print $1}')" != "$(cat ${{ github.workspace }}/rootfs/tmp/applications/mos-$1_$2_amd64.deb$4)" ] ; then
               echo "Checksum error from file: mos-$1_$2_amd64.deb"
               exit 1
             fi
