@@ -1,0 +1,271 @@
+#!/bin/sh
+SYSTEM_JSON=$(jq '.' /boot/config/system.json)
+DOCKER_JSON=$(jq '.' /boot/config/docker.json)
+LXC_JSON=$(jq '.' /boot/config/lxc.json)
+VM_JSON=$(jq '.' /boot/config/vm.json)
+NETWORK_JSON=$(jq '.' /boot/config/network.json)
+
+echo
+start_script() {
+  if [ -f /boot/optional/scripts/pre-start.sh ] ; then
+    cp /boot/optional/scripts/pre-start.sh /tmp/pre-start.sh
+    chmod +x /tmp/pre-start.sh
+    ( /tmp/pre-start.sh )
+    rm -f /tmp/pre-start.sh
+  fi
+}
+
+end_script() {
+  if [ -f /boot/optional/scripts/post-start.sh ] ; then
+    cp /boot/optional/scripts/post-start.sh /tmp/post-start.sh
+    chmod +x /tmp/post-start.sh
+    ( /tmp/post-start.sh )
+    rm -f /tmp/post-start.sh
+  fi
+}
+
+start_ssh() {
+  SSH_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.ssh.enabled')
+  if [ "$SSH_ENABLED" = "true" ] ; then
+    /etc/init.d/ssh start
+  fi
+}
+
+start_ntp() {
+  NTP_ENABLED=$(echo $SYSTEM_JSON | jq -r '.ntp.enabled')
+  if [ "$NTP_ENABLED" = "true" ] ; then
+    /etc/init.d/ntpsec start
+  fi
+}
+
+start_nginx() {
+  /etc/init.d/nginx start
+}
+
+start_api() {
+  /etc/init.d/api start
+}
+
+mount_disks() {
+  /usr/local/bin/mos-mount_disks
+}
+
+start_nut() {
+  NUT_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.nut.enabled')
+  if [ "$NUT_ENABLED" = "true" ] ; then
+    /etc/init.d/nut-server start
+    /etc/init.d/nut-client start
+  fi
+}
+
+optional_packages() {
+  OPTIONAL_PACKAGES=$(ls -1 /boot/optional/packages/)
+  if [ ! -z "$OPTIONAL_PACKAGES" ] ; then
+    logger "Installing additional packages"
+    for package in $OPTIONAL_PACKAGES
+    do
+      logger "Installing: $package"
+      DEBIAN_FRONTEND=noninteractive dpkg -i /boot/optional/packages/$package >/dev/null 2>&1
+    done
+  fi
+}
+
+docker_network_create() {
+  DOCKER_NET_CONFIG=$(echo $DOCKER_JSON | jq -r '.docker_net.config')
+
+  if [ "$(echo $DOCKER_NET_CONFIG | jq '. | length')" = "0" ] ; then
+    DOCKER_SUBNET="$(ip route show dev $1 | awk '/src/ {print $1}')"
+    DOCKER_GATEWAY="$(ip route show default 0.0.0.0/0 dev $1 | awk '{print $3}')"
+  else
+    DOCKER_SUBNET="$(echo $DOCKER_NET_CONFIG | jq -r '.[].subnet')"
+    DOCKER_GATEWAY="$(echo $DOCKER_NET_CONFIG | jq -r '.[].gateway')"
+  fi
+
+  docker network create -d $2 \
+  --subnet=$DOCKER_SUBNET \
+  --gateway=$DOCKER_GATEWAY \
+  -o parent=$1 \
+  $1 >/dev/null 2>&1
+}
+
+docker_network_check() {
+  DOCKER_NET_MODE=$(echo $DOCKER_JSON | jq -r '.docker_net.mode')
+  INTERFACE_MODE=$(echo $NETWORK_JSON | jq -r '.interfaces.eth0.type')
+  if [ "$INTERFACE_MODE" = "bridged" ] ; then
+    INTERFACE=br0
+  else
+    INTERFACE=eth0
+  fi
+  # Check for docker networks where the parent is non existent
+  if [ "$INTERFACE" = "br0" ] ; then
+    if docker network inspect eth0 >/dev/null 2>&1; then
+      docker network rm --force eth0 >/dev/null 2>&1
+      docker_network_create "$INTERFACE" "$DOCKER_NET_MODE"
+    fi
+  else
+    if docker network inspect br0 >/dev/null 2>&1; then
+      docker network rm --force br0 >/dev/null 2>&1
+      docker_network_create "$INTERFACE" "$DOCKER_NET_MODE"
+    fi
+  fi
+  # Check for docker networks with wrong net_mode
+  if [ "$DOCKER_NET_MODE" = "ipvlan" ] ; then
+    if [ "$(docker network inspect $1 >/dev/null 2>&1 | jq -r '.[].Driver')" = "macvlan" ] ; then
+      docker network rm --force $1 >/dev/null 2>&1
+      docker_network_create "$INTERFACE" "$DOCKER_NET_MODE"
+    fi
+  elif [ "$DOCKER_NET_MODE" = "macvlan" ] ; then
+    if [ "$(docker network inspect $1 >/dev/null 2>&1 | jq -r '.[].Driver')" = "ipvlan" ] ; then
+      docker network rm --force $1 >/dev/null 2>&1
+      docker_network_create "$INTERFACE" "$DOCKER_NET_MODE"
+    fi
+  fi
+  # Create docker network if it not exists
+  if ! docker network inspect $1 >/dev/null 2>&1; then
+    docker_network_create "$INTERFACE" "$DOCKER_NET_MODE"
+  fi
+}
+
+docker_autostart() {
+  /usr/local/bin/mos-docker_autostart >/dev/null 2>&1 &
+}
+
+# Docker
+start_docker() {
+  DOCKER_ENABLED=$(echo $DOCKER_JSON | jq -r '.enabled')
+  if [ "$DOCKER_ENABLED" = "true" ] ; then
+    DOCKER_APPDATA=$(echo $DOCKER_JSON | jq -r '.appdata')
+    if [ ! -d $DOCKER_APPDATA ] ; then
+      mkdir -p $DOCKER_APPDATA
+    fi
+    /etc/init.d/docker start
+  fi
+}
+
+
+# LXC
+start_lxc() {
+  LXC_ENABLED=$(echo $LXC_JSON | jq -r '.enabled')
+  if [ "$LXC_ENABLED" = "true" ] ; then
+    LXC_DIRECTORY=$(echo $LXC_JSON | jq -r '.directory')
+    LXC_BRIDGE=$(echo $LXC_JSON | jq -r '.bridge')
+    /etc/init.d/lxc "start" "$LXC_DIRECTORY"
+    /usr/local/bin/mos-lxc_autostart >/dev/null 2>&1 &
+    if [ "$LXC_BRIDGE" = "true" ]; then
+      /etc/init.d/lxc-net start
+    fi
+  fi
+}
+
+# VM
+start_vm() {
+  VM_ENABLED=$(echo $VM_JSON | jq -r '.enabled')
+  if [ "$VM_ENABLED" = "true" ] ; then
+    /etc/init.d/libvirtd start
+    /etc/init.d/virtlogd start
+  fi
+}
+
+# nmbd
+start_nmbd() {
+  NMBD_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.nmbd.enabled')
+  if [ "$NMBD_ENABLED" = "true" ] ; then
+    /etc/init.d/nmbd start
+  fi
+}
+
+# Samba
+start_samba() {
+  SAMBA_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.samba.enabled')
+  if [ "$SAMBA_ENABLED" = "true" ] ; then
+    /etc/init.d/smbd start
+  fi
+}
+
+start_tailscale() {
+  TAILSCALE_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.tailscale.enabled')
+  if [ "$TAILSCALE_ENABLED" = "true" ] ; then
+    /etc/init.d/tailscaled start
+  fi
+}
+
+start_netbird() {
+  NETBIRD_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.netbird.enabled')
+  if [ "$NETBIRD_ENABLED" = "true" ] ; then
+    /etc/init.d/netbird start
+  fi
+}
+
+mos_spindown() {
+  DISKS=$(find /dev/ -name sd?)
+  for disk in $DISKS
+  do
+    nohup /usr/local/bin/mos-set_spindown $disk >/dev/null 2>&1 &
+    setsid /usr/local/bin/mos-spindown_watchdog $disk &>/dev/null < /dev/null &
+  done
+}
+
+# iSCSI Target
+start_iscsi_target() {
+  ISCSI_TARGET_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.iscsi_target.enabled')
+  if [ "$ISCSI_TARGET_ENABLED" = "true" ] ; then
+    /etc/init.d/tgt start
+  fi
+}
+
+# iSCSI Initiator
+start_iscsi_initiator() {
+  ISCSI_INITIATOR_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.iscsi_initiator.enabled')
+  if [ "$ISCSI_INITIATOR_ENABLED" = "true" ] ; then
+    /etc/init.d/iscsid start
+    /usr/local/bin/mos-iscsid_mount >/dev/null 2>&1 &
+  fi
+}
+
+if [ "$1" = "os" ] ; then
+  start_script
+  start_ntp
+  start_ssh
+  start_iscsi_initiator
+  mount_disks
+  start_iscsi_target
+  optional_packages
+  start_nut
+  start_nmbd
+  start_samba
+  start_docker
+  docker_network_check
+  docker_autostart
+  start_lxc
+  start_vm
+  start_tailscale
+  start_netbird
+  if [ ! -f /boot/dontpull ] ; then
+    start_nginx
+    start_api
+  fi
+  mos_spindown
+  end_script
+elif [ "$1" = "docker" ] ; then
+  start_docker
+  docker_network_check
+  docker_autostart
+elif [ "$1" = "lxc" ] ; then
+  start_lxc
+elif [ "$1" = "vm" ] ; then
+  start_vm
+elif [ "$1" = "nmbd" ] ; then
+  start_nmbd
+elif [ "$1" = "samba" ] ; then
+  start_samba
+elif [ "$1" = "tailscale" ] ; then
+  start_tailscale
+elif [ "$1" = "netbird" ] ; then
+  start_netbird
+elif [ "$1" = "nut" ] ; then
+  start_nut
+elif [ "$1" = "iscsi-initiator" ] ; then
+  start_iscsi_initiator
+elif [ "$1" = "iscsi-target" ] ; then
+  start_iscsi_target
+fi

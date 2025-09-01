@@ -1,0 +1,137 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:	  mos-api
+# Required-Start:    $local_fs $remote_fs $network $syslog $named
+# Required-Stop:     $local_fs $remote_fs $network $syslog $named
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: starts the mos-api
+# Description:       starts mos-api using start-stop-daemon
+### END INIT INFO
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+DAEMON="/usr/bin/node"
+ARGS="src/index.js"
+NAME="mos-api"
+DESC="mos-api"
+USER="root"
+
+DIRECTORY="/usr/local/lib/mos-api"
+PID="/run/mos-api.pid"
+
+. /lib/init/vars.sh
+. /lib/lsb/init-functions
+
+# Create admin function
+create_admin() {
+    TOKEN="$(cat /boot/config/api/token)"
+    RESULT="$(curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"username": "admin", "password": "admin", "role": "admin"}' http://localhost:3000/api/v1/auth/users)"
+    if [ -z "$RESULT" ] || [ ! "$(echo $RESULT | jq 'has("error")')" ] ; then
+        logger "MOS API: ERROR: Can't generate admin key"
+    else
+        rm -f /boot/config/api/token
+        touch /boot/config/api/token
+        sync
+        logger "MOS API: Initial Admin user created"
+    fi
+}
+
+# MOS custom: Make sure admin user is created when token is not
+# empty except if other admin users in users.json exist
+check_admin() {
+    sync
+    # Wait for API to become available
+    for i in $(seq 1 20); do
+        if curl -sf http://localhost:3000/health > /dev/null ; then
+            break
+        fi
+        sleep 1
+    done
+    if [ -s "/boot/config/api/token" ] ; then
+        if [ -f /boot/config/api/users.json ]; then
+            if [ "$(jq '.[] | select(.username == "admin")' /boot/config/api/users.json)" ] ; then
+                jq 'map(select(.username != "admin"))' /boot/config/api/users.json > /tmp/users.json && mv /tmp/users.json /boot/config/api/users.json
+            fi
+            if [ -z "$(jq '.[] | select(.role == "admin" and .user != "admin")' /boot/config/api/users.json)" ] ; then
+                log_daemon_msg "Creating admin user, please wait" "$NAME"
+                create_admin
+            else
+                rm -f /boot/config/api/token
+                touch /boot/config/api/token
+                sync
+            fi
+        else
+            log_daemon_msg "Creating admin user, please wait" "$NAME"
+            create_admin
+        fi
+    fi
+}
+
+# MOS custom: Pull latest version from mos-api on service start
+# Switch to pm2 at some point
+download_mosapi() {
+    if [ "$(ls -A /usr/local/lib/mos-api 2>/dev/null)" ] ; then
+        rm -rf /usr/local/lib/mos-api/* /usr/local/lib/mos-api/.* 2>/dev/null
+    fi
+    if [ ! -d /usr/local/lib/mos-api ] ; then
+      mkdir -p /usr/local/lib/mos-api
+    fi
+    cd /usr/local/lib/mos-api
+    git clone https://ba60a3c43e48516b67c694083dbd0910361aedfb:x-oauth-basic@git.minenet.at/ich777/mountainos-api-js.git --depth=1 . >/dev/null 2>&1
+}
+
+start_mosapi() {
+    start-stop-daemon --start --background --make-pidfile --pidfile $PID --chdir "$DIRECTORY" --user $USER --exec "$DAEMON" -- $ARGS >/dev/null 2>&1
+}
+
+stop_mosapi() {
+    start-stop-daemon --stop --pidfile "$PID"
+}
+
+case "$1" in
+	start)
+		log_daemon_msg "Starting $DESC" "$NAME"
+		download_mosapi
+		start_mosapi
+		case "$?" in
+			0|1) log_end_msg 0; check_admin ;;
+			2)   log_end_msg 1 ;;
+		esac
+		;;
+	stop)
+		log_daemon_msg "Stopping $DESC" "$NAME"
+		stop_mosapi
+		case "$?" in
+			0|1) log_end_msg 0 ;;
+			2)   log_end_msg 1 ;;
+		esac
+		;;
+	restart)
+		log_daemon_msg "Restarting $DESC" "$NAME"
+
+		stop_mosapi
+		case "$?" in
+			0|1)
+			download_mosapi
+			start_mosapi
+			case "$?" in
+				0) log_end_msg 0; check_admin ;;
+				1) log_end_msg 1 ;; # Old process is still running
+				*) log_end_msg 1 ;; # Failed to start
+			esac
+			;;
+			*)
+				# Failed to stop
+				log_end_msg 1
+				;;
+		esac
+		;;
+	status)
+		status_of_proc -p $PID "$DAEMON" "$NAME" && exit 0 || exit $?
+		;;
+	*)
+		echo "Usage: $NAME {start|stop|restart|status}" >&2
+		exit 3
+		;;
+esac

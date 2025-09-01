@@ -1,0 +1,108 @@
+#!/bin/bash
+# Mount necessary system directories
+/bin/mount -t proc none /proc
+/bin/mount -t sysfs none /sys
+/bin/mount -t devtmpfs none /dev
+
+# Make Kernel less noisy in terminal
+/bin/echo 4 > /proc/sys/kernel/printk
+
+# Get boot label if set or set to default
+BOOT_LABEL=$(/bin/cat /proc/cmdline | /bin/grep "BOOT_LABEL" | /bin/grep -o 'BOOT_LABEL=[^"]*' | /usr/bin/cut -d '=' -f2)
+if [ -z "$BOOT_LABEL" ] ; then
+  BOOT_LABEL=MOS
+fi
+/bin/echo "Setting boot label to: $BOOT_LABEL"
+
+# Get device to boot from
+BOOT_DEVICE=$(/sbin/blkid -L "$BOOT_LABEL")
+/bin/echo "Setting boot device to: $BOOT_DEVICE"
+
+# Mount boot device
+/bin/echo "Trying to mount $BOOT_DEVICE"
+if [ ! -z "$BOOT_DEVICE" ] ; then
+  /bin/mkdir -p /boot
+  /bin/mount -v -t vfat -o rw,flush,noatime,nodiratime,dmask=77,fmask=177,shortname=mixed $BOOT_DEVICE /boot || { /bin/echo "ERROR: Can't mount device: $BOOT_DEVICE"; sleep infinity; }
+  /bin/echo "$BOOT_DEVICE mounted"
+else
+  /bin/echo "ERROR: Can't get boot device"
+  /bin/sleep infinity
+fi
+
+# DEBUG: Execute script in boot
+if [ -f /boot/script.sh ] ; then
+  /bin/cp /boot/script.sh /tmp/script.sh
+  /bin/chmod +x /tmp/script.sh
+  /tmp/script.sh
+fi
+
+# Install driver packages
+OPTIONAL_DRIVERS="$(/bin/ls -1 /boot/optional/drivers/*.json 2>/dev/null)"
+if [ ! -z "$OPTIONAL_DRIVERS" ] ; then
+  /bin/echo "TODO"
+fi
+
+# Create directories
+/bin/mkdir -p /lib/firmware /lib/modules /var/overlay/lower/drivers
+for dir in upper work; do
+  for subdir in firmware modules; do
+    /bin/mkdir -p /var/overlay/$dir/$subdir
+  done
+done
+
+# Mount drivers
+/bin/echo "Mounting drivers image"
+/bin/mount -t squashfs -o loop /boot/drivers /var/overlay/lower/drivers
+
+# Mount overlay directories
+/bin/mount -t overlay overlay -o lowerdir=/var/overlay/lower/drivers/firmware,upperdir=/var/overlay/upper/firmware,workdir=/var/overlay/work/firmware /lib/firmware
+/bin/mount -t overlay overlay -o lowerdir=/var/overlay/lower/drivers/modules,upperdir=/var/overlay/upper/modules,workdir=/var/overlay/work/modules /lib/modules
+
+# Install optional drivers
+UNAME=$(/bin/uname -r)
+DRIVERS=$(/bin/ls -1 /boot/optional/drivers/*/${UNAME}/*-${UNAME}.deb 2>/dev/null)
+
+if [ ! -z "$DRIVERS" ] ; then
+  for driver in $DRIVERS
+  do
+    /bin/echo "Installing driver: $(/bin/echo $driver | /usr/bin/rev | /usr/bin/cut -d '/' -f1 | /usr/bin/rev)"
+    PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" /usr/bin/dpkg --install $driver
+  done
+  /sbin/depmod --all
+fi
+
+# Copy shadow and passwd from boot device if exist
+if [ -f /boot/config/system/shadow ] ; then
+  /bin/cp /boot/config/system/shadow /etc/shadow
+fi
+if [ -f /boot/config/system/passwd ] ; then
+  /bin/cp /boot/config/system/passwd /etc/passwd
+fi
+if [ -f /boot/config/system/smbpasswd ] ; then
+  /bin/cp /boot/config/system/smbpasswd /etc/samba/smbpasswd
+fi
+
+# Set timezone
+TIMEZONE=$(/usr/bin/jq -r '.timezone' /boot/config/system.json)
+/bin/ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
+
+# Cache json files into RAM
+JSON_FILES=(
+  "docker.json"
+  "lxc.json" 
+  "network.json"
+  "pools.json"
+  "shares.json"
+  "system.json" 
+  "vm.json"
+)
+for json in "${JSON_FILES[@]}"; do
+  [ -f /boot/config/$json ] && /bin/cat /boot/config/$json > /dev/null
+done
+
+# Move system init to /lib/init/system-init
+/bin/mv /init /lib/init/system-init
+
+# Execute init
+/bin/echo "Execute init"
+exec /sbin/init

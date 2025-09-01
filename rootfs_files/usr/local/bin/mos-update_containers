@@ -1,0 +1,39 @@
+#!/bin/sh
+
+REMOVE_LAYERS=${REMOVE_LAYERS:-true}
+
+if [ -z "$1" ] ; then
+  CONTAINERS_JSON=$(cat /var/lib/docker/mos/containers)
+  CONTAINER_NAMES=$(echo $CONTAINERS_JSON | jq -r '.[].name')
+else
+  CONTAINERS_JSON=$(cat /var/lib/docker/mos/containers)
+  if echo $CONTAINERS_JSON | jq -e --arg name "$1" '.[] | select(.name == $name)' >/dev/null ; then
+    CONTAINER_NAMES=$1
+  else
+    echo "Container $1 not in container list found"
+    exit 1
+  fi
+fi
+
+for container in $CONTAINER_NAMES
+do
+  LOCAL_SHA=$(echo $CONTAINERS_JSON | jq -r --arg name "$container" '.[] | select(.name == $name) | .local')
+  REMOTE_SHA=$(echo $CONTAINERS_JSON | jq -r --arg name "$container" '.[] | select(.name == $name) | .remote')
+  if [ "$LOCAL_SHA" != "$REMOTE_SHA" ] ; then
+    if [ ! -f /boot/config/system/docker/templates/$container.json ] ; then
+      echo "ERROR: $container.json not found"
+      continue
+    fi
+    cd /boot/config/system/docker/templates
+    mos-deploy_docker "$container.json" "update_container"
+  else
+    echo "Nothing to do for $container"
+  fi
+done
+
+
+
+
+
+
+

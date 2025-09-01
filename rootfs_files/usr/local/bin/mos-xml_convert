@@ -1,0 +1,239 @@
+#!/bin/sh
+if [ -z "$1" ] ; then
+  echo "ERROR: No argument provided, use either a filename or an URL"
+  exit 1
+elif [ "${1#http://}" != "$1" ] || [ "${1#https://}" != "$1" ]; then
+  if [ "$1" = "${1%/raw*}" ]; then
+    echo "ERROR: URL is not a RAW"
+    exit 1
+  fi
+  URL_CONVERT=true
+  wget -q -O /tmp/convert-temp.xml "$1"
+  FILE=/tmp/convert-temp.xml
+else
+  FILE=$1
+fi
+
+PLUGIN=$(awk -F'[<>]' '/<PluginURL>/ {print $3; exit}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+if [ ! -z "$PLUGIN" ] ; then
+  echo "Plugins can't be converted"
+  exit 1
+fi
+
+DOCKER_APPDATA=$(jq -r '.appdata' /boot/config/docker.json)
+
+NAME=$(awk -F'[<>]' '/<Name>/ {print $3; exit}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+REPO=$(awk -F'[<>]' '/<Repository>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+REGISTRY=$(awk -F'[<>]' '/<Registry>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+NETWORK=$(awk -F'[<>]' '/<Network>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+CUSTOM_IP=$(awk -F'[<>]' '/<MyIP>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+DEFAULT_SHELL=$(awk -F'[<>]' '/<Shell>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+PRIVILEGED=$(awk -F'[<>]' '/<Privileged>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+EXTRA_PARAMETERS=$(awk -F'[<>]' '/<ExtraParams>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+POST_PARAMETERS=$(awk -F'[<>]' '/<PostArgs>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+CPU_SET=$(awk -F'[<>]' '/<CPUset>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+WEB_UI_URL=$(awk -F'[<>]' '/<WebUI>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+ICON=$(awk -F'[<>]' '/<Icon>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+CATEGORY=$(awk -F'[<>]' '/<Category>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+PROJECT=$(awk -F'[<>]' '/<Project>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+SUPPORT=$(awk -F'[<>]' '/<Support>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+OVERVIEW=$(awk -F'[<>]' '/<Overview>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+DONATE=$(awk -F'[<>]' '/<DonateLink>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+REQUIRES=$(awk -F'[<>]' '/<Requires>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
+CONFIGS=$(awk -F'[<>]' '/<Config/ {print $2 " Value=\"" $3"\""}' $FILE)
+
+
+base_json=$(jq -n \
+  --arg name "$NAME" \
+  --arg repo "$REPO" \
+  --arg registry "$REGISTRY" \
+  --arg network "$NETWORK" \
+  --arg custom_ip "$CUSTOM_IP" \
+  --arg default_shell "$DEFAULT_SHELL" \
+  --arg privileged "$PRIVILEGED" \
+  --arg extra_parameters "$EXTRA_PARAMETERS" \
+  --arg post_parameters "$POST_PARAMETERS" \
+  --arg cpu_set "$CPU_SET" \
+  --arg web_ui_url "$WEB_UI_URL" \
+  --arg icon "$ICON" \
+  --arg project "$PROJECT" \
+  --arg support "$SUPPORT" \
+  --arg overview "$OVERVIEW" \
+  '{
+    name: (if $name != "" then $name else null end),
+    repo: (if $repo != "" then $repo else null end),
+    registry: (if $registry != "" then $registry else null end),
+    network: (if $network != "" then $network else null end),
+    custom_ip: (if $custom_ip != "" then $custom_ip else null end),
+    default_shell: (if $default_shell != "" then $default_shell else null end),
+    privileged: (if $privileged != "" then ($privileged | test("true|yes|1"; "i")) else null end),
+    extra_parameters: (if $extra_parameters != "" then $extra_parameters else null end),
+    post_parameters: (if $post_parameters != "" then $post_parameters else null end),
+    cpu_set: (if $cpu_set != "" then $cpu_set else null end),
+    web_ui_url: (if $web_ui_url != "" then $web_ui_url else null end),
+    icon: (if $icon != "" then $icon else null end),
+    project: (if $project != "" then $project else null end),
+    support: (if $support != "" then $support else null end),
+    overview: (if $overview != "" then $overview else null end),
+    paths: [],
+    ports: [],
+    variables: [],
+    devices: [],
+    labels: []
+  }')
+
+extract_attr() {
+  xml="$1"
+  attr="$2"
+  echo "$xml" | grep -o "${attr}=\"[^\"]*\"" | cut -d'"' -f2 | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g'
+}
+
+temp_paths=$(mktemp)
+temp_ports=$(mktemp)
+temp_vars=$(mktemp)
+temp_devices=$(mktemp)
+temp_labels=$(mktemp)
+
+echo "$CONFIGS" | while IFS= read -r config; do
+  [ -z "$config" ] && continue
+  
+  case "$config" in
+    *Type=\"Path\"*)
+      jq -n \
+        --arg name "$(extract_attr "$config" "Name")" \
+        --arg host "$(extract_attr "$config" "Value")" \
+        --arg container "$(extract_attr "$config" "Target")" \
+        --arg mode "$(extract_attr "$config" "Mode")" \
+        --arg description "$(extract_attr "$config" "Description")" \
+        --arg required "$(extract_attr "$config" "Required")" \
+        --arg appdata "$DOCKER_APPDATA" \
+        '{
+          name: (if $name != "" then $name else null end),
+          host: ((if $host != "" then $host elif $container != "" then ($appdata + $container) else null end) as $final_value |
+                if $final_value != null then
+                  (if ($final_value | startswith("/mnt/user") or startswith("/mnt/cache")) then
+                    ($final_value | sub("^/mnt/(user|cache)"; ($appdata | split("/") | .[0:3] | join("/"))))
+                  else $final_value end)
+                else null end),
+          container: (if $container != "" then $container else null end),
+          mode: (if $mode != "" then $mode else null end),
+          description: (if $description != "" then $description else null end),
+          required: (if $required != "" then ($required | test("true|yes|1"; "i")) else null end)
+        }' >> "$temp_paths"
+      ;;
+    *Type=\"Port\"*)
+      jq -n \
+        --arg name "$(extract_attr "$config" "Name")" \
+        --arg host "$(extract_attr "$config" "Value")" \
+        --arg container "$(extract_attr "$config" "Target")" \
+        --arg default "$(extract_attr "$config" "Default")" \
+        --arg protocol "$(extract_attr "$config" "Mode")" \
+        --arg description "$(extract_attr "$config" "Description")" \
+        --arg required "$(extract_attr "$config" "Required")" \
+        --arg mask "$(extract_attr "$config" "Mask")" \
+        '{
+          name: (if $name != "" then $name else null end),
+          host: (if $host != "" then $host elif $default != "" then $default else null end),
+          container: (if $container != "" then $container else null end),
+          protocol: (if $protocol != "" then $protocol else null end),
+          description: (if $description != "" then $description else null end),
+          required: (if $required != "" then ($required | test("true|yes|1"; "i")) else null end),
+          mask: (if $mask != "" then ($mask | test("true|yes|1"; "i")) else null end)
+        }' >> "$temp_ports"
+      ;;
+    *Type=\"Variable\"*)
+      jq -n \
+        --arg name "$(extract_attr "$config" "Name")" \
+        --arg key "$(extract_attr "$config" "Target")" \
+        --arg value "$(extract_attr "$config" "Value")" \
+        --arg default "$(extract_attr "$config" "Default")" \
+        --arg description "$(extract_attr "$config" "Description")" \
+        --arg required "$(extract_attr "$config" "Required")" \
+        --arg mask "$(extract_attr "$config" "Mask")" \
+        '{
+          name: (if $name != "" then $name else null end),
+          key: (if $key != "" then $key else null end),
+          value: ((if $value != "" then $value elif $default != "" then $default else null end) as $final_value |
+          if $final_value != null then
+            (if (($key == "PUID" or $key == "UID") and $final_value == "99") or
+                (($key == "PGID" or $key == "GID") and $final_value == "100")
+            then "500" else $final_value end)
+          else null end),
+          description: (if $description != "" then $description else null end),
+          required: (if $required != "" then ($required | test("true|yes|1"; "i")) else null end),
+          mask: (if $mask != "" then ($mask | test("true|yes|1"; "i")) else null end)
+        }' >> "$temp_vars"
+      ;;
+    *Type=\"Device\"*)
+      jq -n \
+        --arg name "$(extract_attr "$config" "Name")" \
+        --arg host "$(extract_attr "$config" "Value")" \
+        --arg container "$(extract_attr "$config" "Target")" \
+        --arg description "$(extract_attr "$config" "Description")" \
+        --arg required "$(extract_attr "$config" "Required")" \
+        '{
+          name: (if $name != "" then $name else null end),
+          host: (if $host != "" then $host else null end),
+          container: (if $container != "" then $container elif $host != "" then $host else null end),
+          description: (if $description != "" then $description else null end),
+          required: (if $required != "" then ($required | test("true|yes|1"; "i")) else null end)
+        }' >> "$temp_devices"
+      ;;
+    *Type=\"Label\"*)
+      jq -n \
+        --arg name "$(extract_attr "$config" "Name")" \
+        --arg key "$(extract_attr "$config" "Target")" \
+        --arg value "$(extract_attr "$config" "Value")" \
+        --arg description "$(extract_attr "$config" "Description")" \
+        --arg required "$(extract_attr "$config" "Required")" \
+        --arg mask "$(extract_attr "$config" "Mask")" \
+        '{
+          name: (if $name != "" then $name else null end),
+          key: (if $key != "" then $key else null end),
+          value: (if $value != "" then $value else null end),
+          description: (if $description != "" then $description else null end),
+          required: (if $required != "" then ($required | test("true|yes|1"; "i")) else null end),
+          mask: (if $mask != "" then ($mask | test("true|yes|1"; "i")) else null end)
+        }' >> "$temp_labels"
+      ;;
+  esac
+done
+
+paths_array="[]"
+ports_array="[]"
+vars_array="[]"
+devices_array="[]"
+labels_array="[]"
+
+if [ -s "$temp_paths" ]; then
+  paths_array=$(jq -s '.' "$temp_paths")
+fi
+if [ -s "$temp_ports" ]; then
+  ports_array=$(jq -s '.' "$temp_ports")
+fi
+if [ -s "$temp_vars" ]; then
+  vars_array=$(jq -s '.' "$temp_vars")
+fi
+if [ -s "$temp_devices" ]; then
+  devices_array=$(jq -s '.' "$temp_devices")
+fi
+if [ -s "$temp_labels" ]; then
+  labels_array=$(jq -s '.' "$temp_labels")
+fi
+
+FILENAME=${1##*/}
+FILENAME=${FILENAME%.*}.json
+
+echo "$base_json" | jq \
+  --argjson paths "$paths_array" \
+  --argjson ports "$ports_array" \
+  --argjson variables "$vars_array" \
+  --argjson devices "$devices_array" \
+  --argjson labels "$labels_array" \
+  '. + {paths: $paths, ports: $ports, variables: $variables, devices: $devices, labels: $labels}'
+
+rm -f "$temp_paths" "$temp_ports" "$temp_vars" "$temp_devices" "$temp_labels"
+
+if [ "$URL_CONVERT" = "true" ] ; then
+  rm -f /tmp/convert-temp.xml
+fi

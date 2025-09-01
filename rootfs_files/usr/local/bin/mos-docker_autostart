@@ -1,0 +1,21 @@
+#!/bin/sh
+counter=0
+while ! docker info >/dev/null 2>&1 && [ $counter -lt 15 ]; do
+  sleep 1
+  ((counter++))
+done
+AUTOSTART_CONTAINERS=$(jq -r '.[] | select(.autostart == true) | "\(.index):\(.name):\(.wait)"' /var/lib/docker/mos/containers 2>/dev/null | sort -n -t: -k1,1)
+DOCKER_WAIT=$(jq -r '.start_wait' /boot/config/docker.json)
+if [ ! -z "$DOCKER_WAIT" ] && [ "$DOCKER_WAIT" != "null" ] && [ "$DOCKER_WAIT" != "0" ]; then
+  sleep ${DOCKER_WAIT}s
+fi
+if [ ! -z "$AUTOSTART_CONTAINERS" ] && [ "$AUTOSTART_CONTAINERS" != "null" ] ; then
+  for container in $AUTOSTART_CONTAINERS
+  do
+    CONTAINER=${container#*:}
+    if [ ! -z "${CONTAINER#*:}" ] && [ "${CONTAINER#*:}" != "0" ] && [ "${CONTAINER#*:}" != "null" ] ; then
+      sleep ${CONTAINER#*:}s
+    fi
+    docker container start ${CONTAINER%%:*} >/dev/null 2>&1
+  done
+fi

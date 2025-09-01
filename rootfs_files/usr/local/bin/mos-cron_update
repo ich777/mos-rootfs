@@ -1,0 +1,60 @@
+#!/bin/bash
+crontab=""
+
+# Read pools.json
+POOLS_JSON=$(jq -r '.' /boot/config/pools.json 2>/dev/null)
+POOLS_MERGERFS=$(echo $POOLS_JSON | jq -r '.[] | select(.type == "mergerfs") | .id')
+
+pools_cron=""
+if [ "$POOLS_MERGERFS" != "" ] && [ "$POOLS_MERGERFS" != "null" ]; then
+  IFS=$'\n'
+  for pool in $POOLS_MERGERFS; do
+    SYNC_ENABLED=$(echo "$POOLS_JSON" | jq -r ".[] | select(.id == \"$pool\") | .config.sync.enabled")
+    if [ "$SYNC_ENABLED" != "" ] && [ "$SYNC_ENABLED" != "null" ] && [ "$SYNC_ENABLED" == "true" ]; then
+      POOL_NAME=$(echo "$POOLS_JSON" | jq -r ".[] | select(.id == \"$pool\") | .name")
+      SYNC_SCHEDULE=$(echo "$POOLS_JSON" | jq -r ".[] | select(.id == \"$pool\") | .config.sync.schedule")
+      pools_cron="# MOS $POOL_NAME Parity Sync:"'\n'"$SYNC_SCHEDULE /usr/local/bin/mos-snapraid $POOL_NAME sync > /dev/null 2>&1"'\n'
+      CHECK_ENABLED=$(echo "$POOLS_JSON" | jq -r ".[] | select(.id == \"$pool\") | .config.sync.check.enabled")
+      if [ "$CHECK_ENABLED" != "" ] && [ "$CHECK_ENABLED" != "null" ] && [ "$CHECK_ENABLED" == "true" ]; then
+        CHECK_SCHEDULE=$(echo "$POOLS_JSON" | jq -r ".[] | select(.id == \"$pool\") | .config.sync.check.schedule")
+        pools_cron="$pools_cron# MOS $POOL_NAME Parity Check:"'\n'"$CHECK_SCHEDULE /usr/local/bin/mos-snapraid $POOL_NAME check > /dev/null 2>&1"'\n'
+      fi
+    fi
+  done
+fi
+crontab="$crontab$pools_cron"
+
+# Read docker.json
+DOCKER_JSON=$(jq -r '.' /boot/config/docker.json 2>/dev/null)
+DOCKER_UPDATE=$(echo $DOCKER_JSON | jq -r '.update_check.enabled')
+
+docker_cron=""
+if [ "$DOCKER_UPDATE" != "" ] && [ "$DOCKER_UPDATE" != "null" ] && [ "$DOCKER_UPDATE" == "true" ]; then
+  DOCKER_UPDATE_SCHEDULE=$(echo "$DOCKER_JSON" | jq -r '.update_check.update_check_schedule')
+  docker_cron="# MOS Docker Update Check:"'\n'"$DOCKER_UPDATE_SCHEDULE /usr/local/bin/mos-check_for_docker_updates > /dev/null 2>&1"'\n'
+  DOCKER_AUTO_UPDATE=$(echo "$DOCKER_JSON" | jq -r '.update_check.auto_update.enabled')
+  if [ "$DOCKER_AUTO_UPDATE" != "null" ] && [ "$DOCKER_AUTO_UPDATE" != "" ] && [ "$DOCKER_AUTO_UPDATE" == "true" ]; then
+    DOCKER_AUTO_UPDATE=$(echo "$DOCKER_JSON" | jq -r '.update_check.auto_update.auto_update_schedule')
+    docker_cron="# MOS Docker Auto Update:"'\n'"$DOCKER_AUTO_UPDATE /usr/local/bin/mos-update_containers > /dev/null 2>&1"'\n'"$docker_cron"
+  fi
+fi
+crontab="$crontab$docker_cron"
+
+cron_jobs=""
+# Get all crontab entries
+CRON_JSON=$(jq -r '.' /boot/config/system/cron.json 2>/dev/null)
+CRONJOBS=$(echo $CRON_JSON | jq -r '.[] | select(.enabled == true) | .id')
+if [ "$CRONJOBS" != "" ] && [ "$CRONJOBS" != "null" ] && [ "$CRONJOBS" != "[]" ] ; then
+  IFS=$'\n'
+  for cronjob in $CRONJOBS; do
+    NAME=$(echo $CRON_JSON | jq -r ".[] | select(.id == \"$cronjob\") | .name")
+    SCHEDULE=$(echo "$CRON_JSON" | jq -r ".[] | select(.id == \"$cronjob\") | .schedule")
+    COMMAND=$(echo "$CRON_JSON" | jq -r ".[] | select(.id == \"$cronjob\") | .command")
+    if [ "$NAME" != "null" ] && [ "$SCHEDULE" != "null" ] && [ "$COMMAND" != "null" ]; then
+      cron_jobs="$cron_jobs# $NAME:"'\n'"$SCHEDULE $COMMAND"'\n'
+    fi
+  done
+fi
+crontab="$crontab$cron_jobs"
+
+echo -e $crontab | awk 'NF' | crontab -

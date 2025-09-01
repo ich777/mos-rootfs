@@ -1,0 +1,35 @@
+#!/bin/sh -e
+# MOS custom
+
+### BEGIN INIT INFO
+# Provides:          start-mos
+# Required-Start:    $local_fs
+# Required-Stop:     $local_fs
+# Default-Start:     S
+# Default-Stop:      0 6
+# Short-Description: Run mos-startscript
+# Description:       Run mos-start script
+### END INIT INFO
+
+PATH="/sbin:/bin:/usr/sbin:/usr/bin"
+DESC="MOS Start script"
+NAME="start-mos"
+RUN_DIR="/run"
+
+. /lib/lsb/init-functions
+
+start_mos() {
+    /usr/local/bin/mos-start "os" 2>/dev/null
+}
+
+case "$1" in
+	start)
+		log_daemon_msg "Starting $DESC" "$NAME"
+		start_mos
+		log_progress_msg "MOS start done"
+		log_end_msg 0
+		;;
+  stop)
+    exit 0
+    ;;
+esac

@@ -1,0 +1,82 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          iscsid
+# Required-Start:    $network $local_fs
+# Required-Stop:     $network $local_fs sendsigs
+# Default-Start:     S
+# Default-Stop:      0 1 6
+# Short-Description: iSCSI initiator daemon (iscsid)
+# Description:       Starts the iscsid daemon
+### END INIT INFO
+
+
+DESC="iSCSI initiator"
+NAME="iscsid"
+DAEMON=/sbin/iscsid
+PIDFILE=/run/iscsid.pid
+
+ISCSI_CONFIG=$(jq '.' /boot/config/system/iscsi/initiator.json)
+
+. /lib/lsb/init-functions
+
+check_config() {
+  if [ ! -f /boot/config/system/iscsi/initiator.conf ] ; then
+    if [ ! -d /boot/config/system/iscsi ] ; then
+      mkdir -p /boot/config/system/iscsi
+    fi
+    cp /etc/iscsi/iscsid.conf /boot/config/system/iscsi/initiator.conf
+  else
+    cp /boot/config/system/iscsi/initiator.conf /etc/iscsi/iscsid.conf
+  fi
+}
+
+initiator_name() {
+  INITIATOR_NAME=$(echo $ISCSI_CONFIG | jq -r '.initiator.name')
+  echo "InitiatorName=$INITIATOR_NAME" > /etc/iscsi/initiatorname.iscsi
+}
+
+start_initiator() {
+  # Check Config
+  check_config
+
+  # Set Initiator Name
+  initiator_name
+
+  start-stop-daemon --start --quiet --oknodo --exec $DAEMON --pidfile $PIDFILE -- --config=/etc/iscsi/iscsid.conf --initiatorname=/etc/iscsi/initiatorname.iscsi
+}
+
+stop_initiator() {
+  # Disconnect all sessions
+  iscsiadm -m session -u >/dev/null 2>&1
+  sleep 3
+
+  start-stop-daemon --stop --quiet --oknodo --exec $DAEMON --pidfile $PIDFILE
+}
+
+# See how we were called.
+case "$1" in
+    start)
+        log_daemon_msg "Starting $DESC" $NAME
+        start_initiator
+        log_end_msg $?
+    ;;
+
+    stop)
+        log_daemon_msg "Stopping $DESC" $NAME
+        stop_initiator
+        log_end_msg $?
+    ;;
+
+    restart|reload|force-reload)
+        $0 stop_initiator
+        sleep 1
+        $0 start_initiator
+    ;;
+
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 2
+    ;;
+esac
+
+exit $?

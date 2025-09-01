@@ -1,0 +1,32 @@
+#!/bin/sh
+DEVICE="$1"
+if ! /usr/bin/pgrep -f "/usr/local/bin/mos-spindown_watchdog $DEVICE" >/dev/null ; then
+  /usr/bin/logger -t "mos-spindown_watchdog" "Watchdog already running for $DEVICE"
+  exit 1
+fi
+
+SPINDOWN=$(/usr/bin/jq -r '.global_spindown' /boot/config/system.json)
+INTERVAL=$((SPINDOWN * 60))
+
+get_io_count() {
+  /bin/grep " ${DEVICE##*/} " /proc/diskstats | /usr/bin/awk '{print $4 + $8}'
+}
+
+while true
+do
+  [ ! -b "$DEVICE" ] && \
+    { /usr/bin/logger -t "mos-spindown_watchdog" "ERROR: Device $DEVICE not found"; exit 1; }
+  if /sbin/hdparm -C "$DEVICE" 2>/dev/null | /bin/grep -qi "standby"; then
+    /bin/sleep $INTERVAL
+    continue
+  fi
+
+  io_before=$(get_io_count)
+  /bin/sleep $INTERVAL
+  io_after=$(get_io_count)
+
+  if [ "$io_before" -eq "$io_after" ]; then
+    /usr/bin/logger -t "mos-spindown_watchdog" "Spinning down device $DEVICE"
+    /sbin/hdparm -y $DEVICE >/dev/null 2>&1
+  fi
+done

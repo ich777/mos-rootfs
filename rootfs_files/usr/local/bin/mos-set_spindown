@@ -1,0 +1,29 @@
+#!/bin/sh
+if [ -z "$1" ] ; then
+  exit 1
+fi
+
+DEVICE="$1"
+SPINDOWN=$(/usr/bin/jq -r '.global_spindown' /boot/config/system.json)
+
+MODEL=$(/sbin/hdparm -I $DEVICE | /bin/grep "Model Number:" | /usr/bin/cut -d ':' -f2 | tr -d ' ')
+
+if [ "$SPINDOWN" -le 0 ]; then
+  SPINDOWN_VALUE=0
+elif [ "$SPINDOWN" -le 20 ]; then
+  SPINDOWN_VALUE=$((SPINDOWN * 12))
+elif [ $((SPINDOWN % 30)) -eq 0 ] && [ $((SPINDOWN / 30 + 240)) -le 251 ]; then
+  SPINDOWN_VALUE=$((240 + SPINDOWN / 30))
+else
+  SPINDOWN_VALUE=241
+fi
+
+# Workaround for WD disks
+case "$MODEL" in
+  WD*|WDC*)
+    /sbin/hdparm -s 0 $DEVICE >/dev/null 2>&1
+    /sbin/hdparm -B 128 $DEVICE >/dev/null 2>&1
+    ;;
+esac
+
+/sbin/hdparm -S $SPINDOWN_VALUE $DEVICE >/dev/null 2>&1

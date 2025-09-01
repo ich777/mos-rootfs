@@ -1,0 +1,99 @@
+#!/bin/sh -e
+# MOS custom
+
+### BEGIN INIT INFO
+# Provides:          stop-mos
+# Required-Start:
+# Required-Stop:     $local_fs
+# Default-Start:
+# Default-Stop:      0 6
+# Short-Description: Run mos-stop routine
+# Description:       Run mos-stop routine
+### END INIT INFO
+
+PATH="/sbin:/bin:/usr/sbin:/usr/bin"
+NAME="stop-mos"
+RUN_DIR="/run"
+
+. /lib/lsb/init-functions
+
+LXC_JSON=$(jq '.' /boot/config/lxc.json)
+
+shutdown_script() {
+  if [ -f /boot/optional/scripts/shutdown.sh ] ; then
+    cp /boot/optional/scripts/shutdown.sh /tmp/shutdown.sh
+    chmod +x /tmp/shutdown.sh
+    ( /tmp/shutdown.sh )
+    rm -f /tmp/shutdown.sh
+  fi
+}
+
+stop_mos() {
+  shutdown_script
+
+  if [ -f /var/run/ntpd.pid ] ; then
+    /etc/init.d/ntpsec stop
+  fi
+  if [ -f /var/run/sshd.pid ] ; then
+    /etc/init.d/ssh stop
+  fi
+  if [ -f /var/run/iscsid.pid ] ; then
+    /etc/init.d/iscsid stop
+  fi
+  if [ -f /var/run/tgtd.pid ] ; then
+    /etc/init.d/tgt stop
+  fi
+  if [ -f /var/run/nut/upsmon.pid ] ; then
+    /etc/init.d/nut-client stop
+  fi
+  if [ -f /var/run/nut/upsd.pid ] ; then
+    /etc/init.d/nut-server stop
+  fi
+  if [ -f /var/run/samba/nmbd.pid ] ; then
+    /etc/init.d/nmbd stop
+  fi
+  if [ -f /var/run/samba/smbd.pid ] ; then
+    /etc/init.d/smbd stop
+  fi
+  if [ -f /var/run/docker.pid ] ; then
+    /etc/init.d/docker stop
+  fi
+  LXC_ENABLED=$(echo $LXC_JSON | jq -r '.enabled')
+  if [ "$LXC_ENABLED" = "true" ] ; then
+    /etc/init.d/lxc stop
+    LXC_BRIDGE=$(echo $LXC_JSON | jq -r '.bridge')
+    if [ "$LXC_BRIDGE" = "true" ]; then
+      /etc/init.d/lxc-net stop
+    fi
+  fi
+  if [ -f /var/run/virtlogd.pid ] ; then
+    /etc/init.d/virtlogd stop
+  fi
+  if [ -f /var/run/libvirtd.pid ] ; then
+        /etc/init.d/libvirtd stop
+  fi
+  if [ -f /var/run/tailscale.pid ] ; then
+    /etc/init.d/tailscaled stop
+  fi
+  if [ -f /var/run/netbird.pid ] ; then
+    /etc/init.d/netbird stop
+  fi
+  if [ -f /var/run/nginx.pid ] ; then
+    /etc/init.d/nginx stop
+  fi
+  if [ -f /var/run/mos-api.pid ] ; then
+    /etc/init.d/api stop
+  fi
+}
+
+case "$1" in
+	stop)
+		log_daemon_msg "Invoking " "$NAME"
+		stop_mos
+		log_progress_msg "$NAME done"
+		log_end_msg 0
+		;;
+  start)
+    exit 0
+    ;;
+esac

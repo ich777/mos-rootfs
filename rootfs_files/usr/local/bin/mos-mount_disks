@@ -1,0 +1,138 @@
+#!/bin/sh
+PATH=$PATH:/usr/local/bin
+
+# Get json and write it into variable
+POOLS_JSON=$(jq '.[]' /boot/config/pools.json)
+if [ -z "$1" ]; then
+  POOLS=$(echo "$POOLS_JSON" | jq '.name')
+else
+  POOLS="$1"
+fi
+
+create_pool_directory() {
+  if [ "$(mount | grep "/mnt/$1")" ] ; then
+    return 1
+  elif [ ! -d /mnt/$1 ] ; then
+    mkdir -p /mnt/$1
+  fi
+  if [ "$2" == "mergerfs" ] ; then
+    logger "Mounting mergerfs pool: $1"
+    if [ ! -d /var/mergerfs/$1 ] ; then
+      mkdir -p /var/mergerfs/$1
+    fi
+  fi
+}
+
+mergerfs_create_disk_directory() {
+  if [ ! -d /var/mergerfs/$1/disk$2 ] ; then
+    mkdir -p /var/mergerfs/$1/disk$2
+  fi
+}
+
+mergerfs_mount_disk() {
+  if [ ! "$(findmnt /var/mergerfs/$3/disk$4)" ]; then
+    mount -t $1 /dev/disk/by-uuid/$2 /var/mergerfs/$3/disk$4
+  fi
+}
+
+mergerfs_mount_pool() {
+  mergerfs -o defaults,allow_other,use_ino,category.create=$3 $1 /mnt/$2
+}
+
+mergerfs_create_paths() {
+  if [ ! -d /var/mergerfs/$1/disk$3/$2 ] ; then
+    mkdir -p /var/mergerfs/$1/disk$3/$2
+  fi
+}
+
+snapraid_create_parity_directory() {
+  if [ ! -d /var/snapraid/$1/parity$2 ] ; then
+    mkdir -p /var/snapraid/$1/parity$2
+  fi
+}
+
+snapraid_mount_disk() {
+  if [ ! "$(findmnt /var/snapraid/$3/parity$4)" ]; then
+    mount -t $1 /dev/disk/by-uuid/$2 /var/snapraid/$3/parity$4
+  fi
+}
+
+btrfs_mount_pool() {
+  mount /dev/disk/by-uuid/$1 /mnt/$2
+}
+
+ext4_mount_disk() {
+  mount -t ext4 /dev/disk/by-uuid/$1 /mnt/$2
+}
+
+xfs_mount_disk() {
+  mount -t xfs /dev/disk/by-uuid/$1 /mnt/$2
+}
+
+for POOL in $POOLS
+do
+  POOL=$(echo "$POOL" | xargs)
+  POOL_JSON=$(echo "$POOLS_JSON" | jq --arg pool_name "$POOL" '. | select(.name == $pool_name)')
+  if [ -z "$1" ] && [ "$(echo $POOL_JSON | jq -r '.automount')" != "true" ] ; then
+    continue
+  fi
+  POOL_TYPE=$(echo $POOL_JSON | jq -r '.type')
+  if [ "$POOL_TYPE" == "mergerfs" ] ; then
+    create_pool_directory "$POOL" "$POOL_TYPE" || { echo "Pool $POOL already mounted" ; continue ; }
+    CREATE_POLICY=$(echo $POOL_JSON | jq -r '.config.policies.create')
+    for data_slot in $(echo $POOL_JSON | jq -r '.data_devices[].slot')
+    do
+      mergerfs_create_disk_directory "$POOL" "$data_slot"
+      DISK_DETAILS=$(echo "$POOL_JSON" | jq -r --arg data_slot "$data_slot" '.data_devices[] | select(.slot == $data_slot)')
+      DISK_ID=$(echo "$DISK_DETAILS" | jq -r '.id')
+      DISK_FS=$(echo "$DISK_DETAILS" | jq -r '.filesystem')
+      mergerfs_mount_disk "$DISK_FS" "$DISK_ID" "$POOL" "$data_slot"
+      if [ -z "$MOUNTS" ] ; then
+        MOUNTS="/var/mergerfs/$POOL/disk$data_slot"
+      else
+        MOUNTS="$MOUNTS:/var/mergerfs/$POOL/disk$data_slot"
+      fi
+    done
+    mergerfs_mount_pool "$MOUNTS" "$POOL" "$CREATE_POLICY"
+    PARITY_COUNT=$(echo $POOL_JSON | jq -r '.parity_devices | length')
+    if [ "$PARITY_COUNT" != "0" ] ; then
+      for parity_slot in $(echo $POOL_JSON | jq -r '.parity_devices[].slot')
+      do
+        PARITY_DETAILS=$(echo "$POOL_JSON" | jq -r --arg parity_slot "$parity_slot" '.parity_devices[] | select(.slot == $parity_slot)')
+        PARITY_ID=$(echo "$PARITY_DETAILS" | jq -r '.id')
+        PARITY_FS=$(echo "$PARITY_DETAILS" | jq -r '.filesystem')
+        snapraid_create_parity_directory "$POOL" "$parity_slot"
+        snapraid_mount_disk "$PARITY_FS" "$PARITY_ID" "$POOL" "$parity_slot"
+      done
+    fi
+    PATH_RULE_COUNT=$(echo $POOL_JSON | jq -r '.config.path_rules | length')
+    if [ "$PATH_RULE_COUNT" != "0" ] ; then
+      for path in $(echo $POOL_JSON | jq -r '.config.path_rules[].path')
+      do
+        RULE_TARGETS=$(echo "$POOL_JSON" | jq -r --arg path "$path" '.config.path_rules[] | select(.path == $path) | .target_devices[]')
+        if [ "$RULE_TARGETS" != "0" ] ; then
+          for target_device in $RULE_TARGETS
+          do
+            mergerfs_create_paths "$POOL" "${path#/}" "$target_device"
+          done
+        fi
+      done
+    fi
+  elif [ "$POOL_TYPE" == "btrfs" ] ; then
+    create_pool_directory "$POOL" "$POOL_TYPE" || { echo "Pool $POOL already mounted" ; continue ; }
+    logger "Mounting btrfs pool: $POOL"
+    DISK_ID=$(echo "$POOL_JSON" | jq -r --arg disk_no "$DISK_NO" '.data_devices[0].id')
+    btrfs_mount_pool "$DISK_ID" "$POOL"
+  elif [ "$POOL_TYPE" == "ext4" ] ; then
+    create_pool_directory "$POOL" "$POOL_TYPE" || { echo "Pool $POOL already mounted" ; continue ; }
+    logger "Mounting ext4 disk: $POOL"
+    DISK_ID=$(echo "$POOL_JSON" | jq -r --arg disk_no "$DISK_NO" '.data_devices[0].id')
+    ext4_mount_disk "$DISK_ID" "$POOL"
+  elif [ "$POOL_TYPE" == "xfs" ] ; then
+    create_pool_directory "$POOL" "$POOL_TYPE" || { echo "Pool $POOL already mounted" ; continue ; }
+    logger "Mounting xfs disk: $POOL"
+    DISK_ID=$(echo "$POOL_JSON" | jq -r --arg disk_no "$DISK_NO" '.data_devices[0].id')
+    xfs_mount_disk "$DISK_ID" "$POOL"
+  fi
+  unset POOL_JSON DISK_COUNT DISK_NO MOUNTS PARITY_COUNT
+done

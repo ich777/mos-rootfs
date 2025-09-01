@@ -1,0 +1,71 @@
+#!/bin/sh
+
+if [ -z "$1" ] ; then
+  CONTAINERS_JSON=$(cat /var/lib/docker/mos/containers)
+  CONTAINER_NAMES=$(echo $CONTAINERS_JSON | jq -r '.[].name')
+else
+  CONTAINERS_JSON=$(cat /var/lib/docker/mos/containers)
+  if echo $CONTAINERS_JSON | jq -e --arg name "$1" '.[] | select(.name == $name)' >/dev/null ; then
+    CONTAINER_NAMES=$1
+  else
+    echo "Container $1 not in container list found"
+    exit 1
+  fi
+fi
+
+for container in $CONTAINER_NAMES
+do
+  REPO=$(echo $CONTAINERS_JSON | jq -r --arg name "$container" '.[] | select(.name == $name) | .repo')
+  LOCAL_SHA=$(echo $CONTAINERS_JSON | jq -r --arg name "$container" '.[] | select(.name == $name) | .local')
+  REMOTE_SHA_OLD=$(echo $CONTAINERS_JSON | jq -r --arg name "$container" '.[] | select(.name == $name) | .remote')
+
+  if echo "$REPO" | grep -q ':' ; then
+    IMAGE="$REPO"
+  else
+    IMAGE="$REPO:latest"
+  fi
+
+  REMOTE_SHA=$(image-sha $IMAGE)
+
+  REMOTE_SHA=$(echo "$REMOTE_SHA" | head -1)
+
+  case "$REMOTE_SHA" in
+    sha*)
+      :
+      ;;
+
+    *)
+      echo "ERROR: Error getting latest digest for container: $container"
+      continue
+      ;;
+  esac
+
+  if [ "$LOCAL_SHA" != "$REMOTE_SHA" ] ; then
+    if [ "$REMOTE_SHA" != "$REMOTE_SHA_OLD" ] ; then
+      jq --arg repo "$REPO" \
+         --arg name "$container" \
+         --arg local "$LOCAL_SHA" \
+         --arg remote "$REMOTE_SHA" '
+        map(
+          if .repo == $repo and .name == $name then
+            if .remote != $remote or .local != $local then
+              .remote = $remote
+              | .local = $local
+            else
+              .
+            end
+          else
+            .
+          end
+        )
+      ' /var/lib/docker/mos/containers > /var/lib/docker/mos/containers.tmp && mv /var/lib/docker/mos/containers.tmp /var/lib/docker/mos/containers
+      logger --tag "mos-docker_update_check" "Update for container $container found"
+    else
+      logger --tag "mos-docker_update_check" "Update pending for container $container"
+    fi
+  else
+    echo "Nothing to do for container $container"
+  fi
+done
+
+sync

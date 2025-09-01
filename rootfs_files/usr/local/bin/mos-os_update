@@ -1,0 +1,237 @@
+#!/bin/sh
+
+# Get current version
+CURRENT_VERSION=$(jq -r '"\(.mos.version)-\(.mos.channel)"' /etc/mos-release.json 2>/dev/null)
+
+# Rollback to previous version
+rollback_mos() {
+  # Get rollback version
+  ROLLBACK_VERSION=$(jq -r '"\(.mos.version)-\(.mos.channel)"' /boot/rollback/mos-release.json 2>/dev/null)
+
+  # Check if rollback version is in place
+  if [ -f /boot/rollback/rootfs ] ; then
+    echo "Rolling back to MOS version: $ROLLBACK_VERSION"
+    mv /boot/rollback/rootfs* /boot/
+  else
+    echo "ERROR: No MOS release found for rolling back found"
+    exit 1
+  fi
+  
+  # Check if argument was passed over to not roll back Kernel
+  if [ "$2" != "not_kernel" ] ; then
+    if [ -f /boot/rollback/image ] ; then
+      echo "Rolling back Kernel image"
+      mv /boot/rollback/image* /boot/
+    fi
+    if [ -f /boot/rollback/drivers ] ; then
+      echo "Rolling back Kernel drivers"
+      mv /boot/rollback/drivers* /boot/
+    fi
+  fi
+  rm -rf /boot/rollback
+  exit 0
+}
+
+# Check if passed over argument is either "latest" or starting
+# with a semantic version or if "rollback_mos" is passed over
+case "$1" in
+  latest)
+    ;;
+  [0-9]*.[0-9]*.[0-9]*)
+    ;;
+  rollback)
+    rollback_mos
+    ;;
+  *)
+    echo "Please specify either a valid version latest or rollback"
+    exit 1
+    ;;
+esac
+
+# Check if cahnnel is passed over correctly
+case "$2" in
+  alpha|beta|stable)
+    ;;
+  *)
+    echo "Channel can only be: alpha, beta or latest"
+    exit 1
+    ;;
+esac
+
+# Call mos-os_get_releases to get available MOS versions
+if ! /usr/local/bin/mos-os_get_releases ; then
+  exit 1
+fi
+
+# Create necessary directories
+mkdir -p /tmp/mos-update/update >/dev/null 2>&1
+
+# Set version depending on which argument is passed over
+if [ "$1" = "latest" ] ; then
+  VERSION=$(jq --arg channel "$2" -r '.[] | select(.tag_name | contains($channel)) | .tag_name' /tmp/mos-update/releases.json | sort -V | tail -1)
+else
+  VERSION="$1"
+fi
+
+# Display message if upgrading to the same version
+if [ "$VERSION" = "$CURRENT_VERSION" ] ; then
+  echo "Version is the same as the current running MOS version, continung in 10 seconds"
+  sleep 10
+else
+  echo "Changing MOS version from: $CURRENT_VERSION to version: $VERSION"
+fi
+
+# Get assets ID's from rootfs and md5
+ASSET_ROOTFS=$(jq --arg version $VERSION -r '.[] | select(.tag_name == $version) | .assets[] | select(.name == "rootfs") | .id' /tmp/mos-update/releases.json)
+ASSET_ROOTFS_MD5=$(jq --arg version $VERSION -r '.[] | select(.tag_name == $version) | .assets[] | select(.name == "rootfs.md5") | .id' /tmp/mos-update/releases.json)
+
+# Not update Kernel if nothing is passed through
+if [ "$3" = "update_kernel" ] ; then
+  # Get asset id from mos-release.json
+  ASSET_RELEASE_JSON=$(jq --arg version $VERSION -r '.[] | select(.tag_name == $version) | .assets[] | select(.name == "mos-release.json") | .id' /tmp/mos-update/releases.json)
+
+  # Download mos-release.json and check if download was successful
+  curl -s -L \
+  --header "Authorization: Bearer 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" \
+  --header "Accept: application/octet-stream" \
+  --header "X-GitHub-Api-Version: 2022-11-28" \
+  --output "/tmp/mos-update/mos-$VERSION.json" \
+  "https://api.github.com/repos/ich777/mos-releases/releases/assets/$ASSET_RELEASE_JSON"
+  EXIT_STATUS=$?
+  if [ "$EXIT_STATUS" != "0" ] ; then
+    echo "Something went wrong getting recommended Kernel version, not updating Kernel"
+    rm -f /tmp/mos-update/mos-$VERSION.json
+    UPDATE_KERNEL="false"
+  else
+    # Extract recommended Kernel version
+    KERNEL=$(jq -r '.mos.recommended_kernel' /tmp/mos-update/mos-$VERSION.json)
+    RUNNING_KERNEL=$(uname -r)
+    # Compare if Kernel needs to be upgraded
+    if [ "$RUNNING_KERNEL" != $KERNEL ] ; then
+      echo "New recommended Kernel: $KERNEL"
+      curl -s --request GET \
+        --url "https://api.github.com/repos/ich777/mos-kernel/releases?per_page=100" \
+        --header "Authorization: Bearer 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" \
+        --header "X-GitHub-Api-Version: 2022-11-28" \
+        -o /tmp/mos-update/$KERNEL.json
+      # Get assed ID's for image/drivers and md5's
+      ASSET_KERNEL=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "image") | .id' /tmp/mos-update/$KERNEL.json)
+      ASSET_DRIVERS=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "drivers") | .id' /tmp/mos-update/$KERNEL.json)
+      ASSET_KERNEL_MD5=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "image") | .id' /tmp/mos-update/$KERNEL.json)
+      ASSET_DRIVERS_MD5=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "drivers") | .id' /tmp/mos-update/$KERNEL.json)
+      UPDATE_KERNEL="true"
+    else
+      echo "Kernel $RUNNING_KERNEL alread up-to-date"
+      UPDATE_KERNEL="false"
+    fi
+  fi
+fi
+
+# Download rootfs
+echo "Downloading rootfs"
+curl --progress-bar -L \
+  --header "Authorization: Bearer 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" \
+  --header "Accept: application/octet-stream" \
+  --header "X-GitHub-Api-Version: 2022-11-28" \
+  --output "/tmp/mos-update/update/rootfs" \
+  "https://api.github.com/repos/ich777/mos-releases/releases/assets/$ASSET_ROOTFS"
+
+# Download rootfs.md5
+echo "Downloading rootfs.md5"
+curl -s -L \
+  --header "Authorization: Bearer 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" \
+  --header "Accept: application/octet-stream" \
+  --header "X-GitHub-Api-Version: 2022-11-28" \
+  --output "/tmp/mos-update/update/rootfs.md5" \
+  "https://api.github.com/repos/ich777/mos-releases/releases/assets/$ASSET_ROOTFS_MD5"
+
+# Verify checksum
+echo "Verifying md5 checksum from rootfs"
+if [ "$(md5sum /tmp/mos-update/update/rootfs | awk '{print $1}')" != "$(cat /tmp/mos-update/update/rootfs.md5)" ] ; then
+  echo "rootfs checksum error"
+  rm -rf /tmp/mos-update/update
+  exit 1
+else
+  echo "rootfs checksum OK"
+fi
+
+if [ "$UPDATE_KERNEL" = "true" ] ; then
+  # Download kernel
+  echo "Downloading Kernel image"
+  curl --progress-bar -L \
+    --header "Authorization: Bearer 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" \
+    --header "Accept: application/octet-stream" \
+    --header "X-GitHub-Api-Version: 2022-11-28" \
+    --output "/tmp/mos-update/update/image" \
+    "https://api.github.com/repos/ich777/mos-kernel/releases/assets/$ASSET_KERNEL"
+
+  # Download drivers
+  echo "Downloading Kernel drivers"
+  curl --progress-bar -L \
+    --header "Authorization: Bearer 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" \
+    --header "Accept: application/octet-stream" \
+    --header "X-GitHub-Api-Version: 2022-11-28" \
+    --output "/tmp/mos-update/update/drivers" \
+    "https://api.github.com/repos/ich777/mos-kernel/releases/assets/$ASSET_DRIVERS"
+
+  # Download kernel.md5
+  curl -s -L \
+    --header "Authorization: Bearer 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" \
+    --header "Accept: application/octet-stream" \
+    --header "X-GitHub-Api-Version: 2022-11-28" \
+    --output "/tmp/mos-update/update/image.md5" \
+    "https://api.github.com/repos/ich777/mos-kernel/releases/assets/$ASSET_KERNEL_MD5"
+
+  # Download drivers.md5
+  curl -s -L \
+    --header "Authorization: Bearer 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" \
+    --header "Accept: application/octet-stream" \
+    --header "X-GitHub-Api-Version: 2022-11-28" \
+    --output "/tmp/mos-update/update/drivers.md5" \
+    "https://api.github.com/repos/ich777/mos-kernel/releases/assets/$ASSET_DRIVERS_MD5"
+
+  # Verify checksum from image
+  echo "Verifying md5 checksum from Kernel image"
+  if [ "$(md5sum /tmp/mos-update/update/image | awk '{print $1}')" != "$(cat /tmp/mos-update/update/image.md5)" ] ; then
+    echo "ERROR: Kernel image checksum error, not updating Kernel"
+    rm -f /tmp/mos-update/update/image* /tmp/mos-update/update/drivers*
+    UPDATE_KERNEL="false"
+  else
+    echo "Kernel image checksum OK"
+  fi
+
+  # Verify checksum from drivers
+  echo "Verifying md5 checksum from Kernel drivers"
+  if [ "$(md5sum /tmp/mos-update/update/drivers | awk '{print $1}')" != "$(cat /tmp/mos-update/update/drivers.md5)" ] ; then
+    echo "ERROR: Kernel drivers checksum error, not updating Kernel"
+    rm -f /tmp/mos-update/update/image* /tmp/mos-update/update/drivers*
+    UPDATE_KERNEL="false"
+  else
+    echo "Kernel drivers checksum OK"
+  fi
+fi
+
+# Get rollback version
+ROLLBACK_VERSION=$(jq -r '"\(.mos.version)-\(.mos.channel)"' /boot/rollback/mos-release.json 2>/dev/null)
+
+# Check if rollback version is the same as installed version
+if [ "$CURRENT_VERSION" != "$ROLLBACK_VERSION" ] ; then
+  echo "Moving current MOS version to /boot/rollback"
+  if [ ! -d /boot/rollback ] ; then
+    mkdir -p /boot/rollback >/dev/null 2>&1
+  else
+    rm -rf /boot/rollback/*
+  fi
+
+  mv /boot/rootfs* /boot/rollback/
+  cp /etc/mos-release.json /boot/rollback/
+  mv /tmp/mos-update/update/rootfs* /boot/
+
+  if [ "$UPDATE_KERNEL" = "true" ] ; then
+    echo "Moving Kernel image and drivers to /boot/rollback"
+    mv /boot/image* /boot/drivers* /boot/rollback/
+    mv /tmp/mos-update/update/image* /tmp/mos-update/update/drivers* /boot/
+  fi
+else
+  echo "INFO: Rollback MOS version already in palce"
+fi

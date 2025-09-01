@@ -1,0 +1,225 @@
+#! /bin/sh
+
+### BEGIN INIT INFO
+# Provides:		ssh sshd
+# Required-Start:	$remote_fs $syslog
+# Required-Stop:	$remote_fs $syslog
+# Default-Start:	2 3 4 5
+# Default-Stop:		
+# Short-Description:	OpenBSD Secure Shell server
+### END INIT INFO
+
+set -e
+
+# /etc/init.d/ssh: start and stop the OpenBSD "secure shell(tm)" daemon
+
+test -x /usr/sbin/sshd || exit 0
+( /usr/sbin/sshd -\? 2>&1 | grep -q OpenSSH ) 2>/dev/null || exit 0
+
+umask 022
+
+if test -f /etc/default/ssh; then
+    . /etc/default/ssh
+fi
+
+. /lib/lsb/init-functions
+
+if [ -n "$2" ]; then
+    SSHD_OPTS="$SSHD_OPTS $2"
+fi
+
+# Are we running from init?
+run_by_init() {
+    ([ "$previous" ] && [ "$runlevel" ]) || [ "$runlevel" = S ]
+}
+
+# MOS custom
+generate_host_key_type() {
+	local bit_size key_type
+
+	key_type=$1
+	if [ ! -f /etc/ssh/ssh_host_"${key_type}"_key ]; then
+		case $key_type in
+			ecdsa)	bit_size="$ecdsa_bit_size";;
+			rsa)	bit_size="$rsa_bit_size";;
+		esac
+		log_action_msg "Generating $key_type SSH host key..."
+		ssh-keygen \
+			-q \
+			-f /etc/ssh/ssh_host_"$key_type"_key \
+			-N '' \
+			-t "$key_type" \
+			${bit_size:+ -b ${bit_size}} || exit 1
+	fi
+}
+
+# MOS custom
+generate_host_keys() {
+	local type
+
+	if [ -z "$key_types_to_generate" ] &&
+	   [ -z "$ecdsa_bit_size" ] && [ -z "$rsa_bit_size" ]; then
+		ssh-keygen -A
+		return
+	fi
+	for type in ${key_types_to_generate:-dsa ecdsa ed25519 rsa}; do
+		generate_host_key_type "$type" || exit 1
+	done
+}
+
+check_for_no_start() {
+    # forget it if we're trying to start, and /etc/ssh/sshd_not_to_be_run exists
+    if [ -e /etc/ssh/sshd_not_to_be_run ]; then 
+	if [ "$1" = log_end_msg ]; then
+	    log_end_msg 0 || true
+	fi
+	if ! run_by_init; then
+	    log_action_msg "OpenBSD Secure Shell server not in use (/etc/ssh/sshd_not_to_be_run)" || true
+	fi
+	exit 0
+    fi
+}
+
+check_dev_null() {
+    if [ ! -c /dev/null ]; then
+	if [ "$1" = log_end_msg ]; then
+	    log_end_msg 1 || true
+	fi
+	if ! run_by_init; then
+	    log_action_msg "/dev/null is not a character device!" || true
+	fi
+	exit 1
+    fi
+}
+
+check_privsep_dir() {
+    # Create the PrivSep empty dir if necessary
+    if [ ! -d /run/sshd ]; then
+	mkdir /run/sshd
+	chmod 0755 /run/sshd
+    fi
+}
+
+check_config() {
+    if [ ! -e /etc/ssh/sshd_not_to_be_run ]; then
+	# shellcheck disable=SC2086
+	/usr/sbin/sshd $SSHD_OPTS -t || exit 1
+    fi
+}
+
+# MOS custom: modification to persist SSH keys at:
+# /boot/config/ssh and create symlink to /root/.ssh
+check_mos() {
+	if [ ! -d /boot/config/ssh ] ; then
+		/bin/mkdir -p /boot/config/ssh || exit 1
+		generate_host_keys || exit 1
+		cp -n /etc/ssh/ssh_host_*_key* /boot/config/ssh/ 2>/dev/null
+	else
+		if [ ! -f /boot/config/ssh/ssh_host_ecdsa_key ] || [ ! -f /boot/config/ssh/ssh_host_ed25519_key ] || [ ! -f /boot/config/ssh/ssh_host_rsa_key ] ; then
+			generate_host_keys || exit 1
+			cp -n /etc/ssh/ssh_host_*_key* /boot/config/ssh/ 2>/dev/null
+		else
+			cp -n /boot/config/ssh/ssh_host_*_key* /etc/ssh/ 2>/dev/null
+		fi
+	fi
+	if [ ! -d /root/.ssh ] ; then
+		[ ! -d /boot/config/ssh/root ] \
+			&& mkdir -p /boot/config/ssh/root
+		ln -s /boot/config/ssh/root /root/.ssh
+	fi
+}
+
+
+export PATH="${PATH:+$PATH:}/usr/sbin:/sbin"
+
+case "$1" in
+  start)
+	check_privsep_dir
+	check_for_no_start
+	check_dev_null
+	# MOS custom
+	check_mos
+	log_daemon_msg "Starting OpenBSD Secure Shell server" "sshd" || true
+	# shellcheck disable=SC2086
+	if start-stop-daemon --start --quiet --oknodo --chuid 0:0 --pidfile /run/sshd.pid --exec /usr/sbin/sshd -- $SSHD_OPTS; then
+	    log_end_msg 0 || true
+	else
+	    log_end_msg 1 || true
+	fi
+	;;
+  stop)
+	log_daemon_msg "Stopping OpenBSD Secure Shell server" "sshd" || true
+	if start-stop-daemon --stop --quiet --oknodo --pidfile /run/sshd.pid --exec /usr/sbin/sshd; then
+	    log_end_msg 0 || true
+	else
+	    log_end_msg 1 || true
+	fi
+	;;
+
+  reload|force-reload)
+	check_for_no_start
+	check_config
+	log_daemon_msg "Reloading OpenBSD Secure Shell server's configuration" "sshd" || true
+	if start-stop-daemon --stop --signal 1 --quiet --oknodo --pidfile /run/sshd.pid --exec /usr/sbin/sshd; then
+	    log_end_msg 0 || true
+	else
+	    log_end_msg 1 || true
+	fi
+	;;
+
+  restart)
+	check_privsep_dir
+	check_config
+	log_daemon_msg "Restarting OpenBSD Secure Shell server" "sshd" || true
+	start-stop-daemon --stop --quiet --oknodo --retry 30 --pidfile /run/sshd.pid --exec /usr/sbin/sshd
+	check_for_no_start log_end_msg
+	check_dev_null log_end_msg
+	# shellcheck disable=SC2086
+	if start-stop-daemon --start --quiet --oknodo --chuid 0:0 --pidfile /run/sshd.pid --exec /usr/sbin/sshd -- $SSHD_OPTS; then
+	    log_end_msg 0 || true
+	else
+	    log_end_msg 1 || true
+	fi
+	;;
+
+  try-restart)
+	check_privsep_dir
+	check_config
+	log_daemon_msg "Restarting OpenBSD Secure Shell server" "sshd" || true
+	RET=0
+	start-stop-daemon --stop --quiet --retry 30 --pidfile /run/sshd.pid --exec /usr/sbin/sshd || RET="$?"
+	case $RET in
+	    0)
+		# old daemon stopped
+		check_for_no_start log_end_msg
+		check_dev_null log_end_msg
+		# shellcheck disable=SC2086
+		if start-stop-daemon --start --quiet --oknodo --chuid 0:0 --pidfile /run/sshd.pid --exec /usr/sbin/sshd -- $SSHD_OPTS; then
+		    log_end_msg 0 || true
+		else
+		    log_end_msg 1 || true
+		fi
+		;;
+	    1)
+		# daemon not running
+		log_progress_msg "(not running)" || true
+		log_end_msg 0 || true
+		;;
+	    *)
+		# failed to stop
+		log_progress_msg "(failed to stop)" || true
+		log_end_msg 1 || true
+		;;
+	esac
+	;;
+
+  status)
+	status_of_proc -p /run/sshd.pid /usr/sbin/sshd sshd && exit 0 || exit $?
+	;;
+
+  *)
+	log_action_msg "Usage: /etc/init.d/ssh {start|stop|reload|force-reload|restart|try-restart|status}" || true
+	exit 1
+esac
+
+exit 0

@@ -1,0 +1,7 @@
+#!/bin/sh
+LXC_WAIT=$(jq -r '.start_wait' /boot/config/lxc.json)
+if [ ! -z "$LXC_WAIT" ] && [ "$LXC_WAIT" != "null" ] && [ "$LXC_WAIT" != "0" ]; then
+  sleep ${LXC_WAIT}s
+fi
+
+/usr/libexec/lxc/lxc-containers start
