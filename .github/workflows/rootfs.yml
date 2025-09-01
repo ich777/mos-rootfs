@@ -78,7 +78,8 @@ jobs:
           else
             REPO="$1"
           fi
-          
+
+          echo "Downloading: mos-$1_$2_amd64.deb$4"
           curl --progress-bar -L \
               --header "Authorization: Bearer ${{ secrets.MOS_TOKEN }}" \
               --header "Accept: application/octet-stream" \
