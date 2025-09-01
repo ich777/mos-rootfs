@@ -96,7 +96,7 @@ if [ "$3" = "update_kernel" ] ; then
   --header "Accept: application/octet-stream" \
   --header "X-GitHub-Api-Version: 2022-11-28" \
   --output "/tmp/mos-update/mos-$VERSION.json" \
-  "https://api.github.com/repos/ich777/mos-releases/releases/assets/$ASSET_RELEASE_JSON"
+  "https://api.github.com/repos/ich777/mos-rootfs/releases/assets/$ASSET_RELEASE_JSON"
   EXIT_STATUS=$?
   if [ "$EXIT_STATUS" != "0" ] ; then
     echo "Something went wrong getting recommended Kernel version, not updating Kernel"
@@ -134,7 +134,7 @@ curl --progress-bar -L \
   --header "Accept: application/octet-stream" \
   --header "X-GitHub-Api-Version: 2022-11-28" \
   --output "/tmp/mos-update/update/rootfs" \
-  "https://api.github.com/repos/ich777/mos-releases/releases/assets/$ASSET_ROOTFS"
+  "https://api.github.com/repos/ich777/mos-rootfs/releases/assets/$ASSET_ROOTFS"
 
 # Download rootfs.md5
 echo "Downloading rootfs.md5"
@@ -143,7 +143,7 @@ curl -s -L \
   --header "Accept: application/octet-stream" \
   --header "X-GitHub-Api-Version: 2022-11-28" \
   --output "/tmp/mos-update/update/rootfs.md5" \
-  "https://api.github.com/repos/ich777/mos-releases/releases/assets/$ASSET_ROOTFS_MD5"
+  "https://api.github.com/repos/ich777/mos-rootfs/releases/assets/$ASSET_ROOTFS_MD5"
 
 # Verify checksum
 echo "Verifying md5 checksum from rootfs"
