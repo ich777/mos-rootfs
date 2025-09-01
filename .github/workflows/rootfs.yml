@@ -251,6 +251,16 @@ jobs:
         asset_name: rootfs.md5
         asset_content_type: text/plain
 
+    - name: Upload mos-release.json
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ${{ github.workspace }}/release/mos-release.json
+        asset_name: mos-release.json
+        asset_content_type: application/vnd.github+json
+
     - name: Cleanup
       if: always()
       run: rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.*
