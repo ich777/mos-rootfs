@@ -124,8 +124,8 @@ jobs:
         fi
 
         # Get Asset IDs
-        LXC_DEB=$(echo $LXC_JSON | jq --arg version v${LXC_JSON#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-lxc") and endswith(".deb")) | .id')
-        LXC_DEB_MD5=$(echo $LXC_JSON | jq --arg version v${LXC_JSON#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-lxc") and endswith(".deb.md5")) | .id')
+        LXC_DEB=$(echo $LXC_JSON | jq --arg version v${LXC_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-lxc") and endswith(".deb")) | .id')
+        LXC_DEB_MD5=$(echo $LXC_JSON | jq --arg version v${LXC_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-lxc") and endswith(".deb.md5")) | .id')
 
         # Get QEMU Releases
         QEMU_JSON=$(curl -s --request GET \
