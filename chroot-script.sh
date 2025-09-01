@@ -10,7 +10,7 @@ DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends --no-i
 
 DEB_APPS=$(ls -1 /tmp/applications/*.deb)
 for deb_app in $DEB_APPS; do
-  apt -y install $deb_app
+  /usr/bin/apt -y install $deb_app
 done
 
 TAR_GZ_APPS=$(ls -1 /tmp/applications/*.tar.gz)
