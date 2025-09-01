@@ -62,7 +62,7 @@ jobs:
       run: |
         cd ${{ github.workspace }}
         debootstrap --variant=minbase daedalus ${{ github.workspace }}/rootfs https://pkgmaster.devuan.org/merged
-        cp -R ${{ github.workspace }}/rootfs_files/* ${{ github.workspace }}/rootfs/
+        cp -R ${{ github.workspace }}/rootfs_files ${{ github.workspace }}/rootfs/tmp/
         cp ${{ github.workspace }}/chroot-script.sh ${{ github.workspace }}/rootfs/tmp/chroot-script.sh
         chmod +x ${{ github.workspace }}/rootfs/tmp/chroot-script.sh
 
@@ -190,6 +190,7 @@ jobs:
         mkdir -p $WORKDIR/release
 
         cd $ROOTFS
+        cp -R $ROOTFS/tmp/rootfs_files/* $ROOTFS/
         chmod -R 755 $ROOTFS/usr/local/bin
         rm -rf $ROOTFS/root/.* $ROOTFS/var/log/* $ROOTFS/root/* $ROOTFS/tmp/* $ROOTFS/tmp/.* $ROOTFS/var/lib/apt/lists/* $ROOTFS/etc/init.d/.* $ROOTFS/etc/resolv.conf $ROOTFS/var/cache/apt/* $ROOTFS/var/cache/apt/.*
 
