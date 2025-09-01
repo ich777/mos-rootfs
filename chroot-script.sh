@@ -8,6 +8,16 @@ DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends --no-i
   net-tools sysstat pciutils usbutils nut-server beep inotify-tools libjson-glib-1.0-0 libxml2 libpciaccess0 open-iscsi tgt \
   iptables libpixman-1-0 libspice-server1 libusbredirparser1 dnsmasq lm-sensors gnutls-bin cron rsync fuse3 nfs-kernel-server nfs-common
 
+DEB_APPS=$(ls -1 /tmp/applications/*.deb)
+for deb_app in $DEB_APPS; do
+  apt -y install $deb_app
+done
+
+TAR_GZ_APPS=$(ls -1 /tmp/applications/*.tar.gz)
+for tar_gz_app in $TAR_GZ_APPS; do
+  tar -C / -xf $tar_gz_app
+done
+
 rm -rf /bin/sh
 ln -sf /bin/bash /bin/sh
 
@@ -79,10 +89,9 @@ wget -O /tmp/node.xz https://nodejs.org/dist/v22.19.0/node-v22.19.0-linux-x64.ta
 tar -xf /tmp/node.xz
 rm -f /tmp/node-*/CHANGE* /tmp/node-*/README* /tmp/node-*/LICENSE*
 cp -R /tmp/node-*/* /usr/
-rm -rf /tmp/*
 
 # /etc/passwd editieren:
-# root::0:0:root:/root:/bin/bash
+sed -i '/^root::/c root::0:0:root:/root:/bin/bash' /etc/passwd
 
 rm -rf /home
 
