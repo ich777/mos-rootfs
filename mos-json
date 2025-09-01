@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # OS-Informationen sammeln
-os_info=$(cat $1/etc/os-release | jq -R 'split("=") | {(.[0]): (.[1] | gsub("\""; ""))}' | jq -s 'add')
+os_info=$(cat $4/etc/os-release | jq -R 'split("=") | {(.[0]): (.[1] | gsub("\""; ""))}' | jq -s 'add')
 
 # Package-Informationen sammeln
-packages=$(chroot $1 dpkg-query -l | awk '$1 == "ii" {print $2, $3}' | jq -R 'split(" ") | {name: .[0], version: .[1]}' | jq -s .)
+packages=$(chroot $4 dpkg-query -l | awk '$1 == "ii" {print $2, $3}' | jq -R 'split(" ") | {name: .[0], version: .[1]}' | jq -s .)
 
 # Alles zusammenführen
 jq -n \
