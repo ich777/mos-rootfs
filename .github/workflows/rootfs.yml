@@ -232,8 +232,6 @@ jobs:
         mkdir -p $WORKDIR/release
 
         cd $ROOTFS
-        cp -R $ROOTFS/tmp/rootfs_files/* $ROOTFS/
-        chmod -R 755 $ROOTFS/usr/local/bin
         rm -rf $ROOTFS/root/.* $ROOTFS/var/log/* $ROOTFS/root/* $ROOTFS/tmp/* $ROOTFS/tmp/.* $ROOTFS/var/lib/apt/lists/* $ROOTFS/etc/init.d/.* $ROOTFS/etc/resolv.conf $ROOTFS/var/cache/apt/* $ROOTFS/var/cache/apt/.*
 
         CHANNEL=${{ github.event.inputs.mos_channel }}
