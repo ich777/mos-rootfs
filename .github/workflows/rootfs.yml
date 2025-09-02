@@ -179,6 +179,32 @@ jobs:
         MERGERFS_DEB=$(echo $MERGERFS_JSON | jq --arg version v${MERGERFS_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-mergerfs") and endswith(".deb")) | .id')
         MERGERFS_DEB_MD5=$(echo $MERGERFS_JSON | jq --arg version v${MERGERFS_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-mergerfs") and endswith(".deb.md5")) | .id')
 
+        # Get image-sha Releases
+        IMAGESHA_JSON=$(curl -s --request GET \
+            --url "https://api.github.com/repos/ich777/mos-image-sha/releases?per_page=50" \
+            --header "Authorization: Bearer ${{ secrets.MOS_TOKEN }}" \
+            --header "X-GitHub-Api-Version: 2022-11-28")
+
+        # Define IMAGESHA_VERSION
+        IMAGESHA_VERSION=$(echo $IMAGESHA_JSON | jq -r '.[].tag_name' | sort -V | tail -1)
+
+        # Get Asset IDs
+        IMAGESHA_DEB=$(echo $IMAGESHA_JSON | jq --arg version v${IMAGESHA_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-image-sha") and endswith(".deb")) | .id')
+        IMAGESHA_DEB_MD5=$(echo $IMAGESHA_JSON | jq --arg version v${IMAGESHA_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-image-sha") and endswith(".deb.md5")) | .id')
+
+        # Get docker-watchdog Releases
+        DOCKERWD_JSON=$(curl -s --request GET \
+            --url "https://api.github.com/repos/ich777/mos-docker-watchdog/releases?per_page=50" \
+            --header "Authorization: Bearer ${{ secrets.MOS_TOKEN }}" \
+            --header "X-GitHub-Api-Version: 2022-11-28")
+
+        # Define DOCKERWD_VERSION
+        DOCKERWD_VERSION=$(echo $DOCKERWD_JSON | jq -r '.[].tag_name' | sort -V | tail -1)
+
+        # Get Asset IDs
+        DOCKERWD_DEB=$(echo $DOCKERWD_JSON | jq --arg version v${DOCKERWD_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-docker-watchdog") and endswith(".deb")) | .id')
+        DOCKERWD_DEB_MD5=$(echo $DOCKERWD_JSON | jq --arg version v${DOCKERWD_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-docker-watchdog") and endswith(".deb.md5")) | .id')
+
         # Download applications
         application_download "docker" "${DOCKER_VERSION#v}" "$DOCKER_DEB"
         application_download "docker" "${DOCKER_VERSION#v}" "$DOCKER_DEB_MD5" ".md5"
@@ -190,6 +216,10 @@ jobs:
         application_download "snapraid" "${SNAPRAID_VERSION#v}" "$SNAPRAID_DEB_MD5" ".md5"
         application_download "mergerfs" "${MERGERFS_VERSION#v}" "$MERGERFS_DEB"
         application_download "mergerfs" "${MERGERFS_VERSION#v}" "$MERGERFS_DEB_MD5" ".md5"
+        application_download "image-sha" "${IMAGESHA_VERSION#v}" "$IMAGESHA_DEB"
+        application_download "image-sha" "${IMAGESHA_VERSION#v}" "$IMAGESHA_DEB_MD5" ".md5"
+        application_download "docker-watchdog" "${DOCKERWD_VERSION#v}" "$DOCKERWD_DEB"
+        application_download "docker-watchdog" "${DOCKERWD_VERSION#v}" "$DOCKERWD_DEB_MD5" ".md5"
 
     - name: Modify rootfs
       run: |
