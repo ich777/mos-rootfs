@@ -62,6 +62,8 @@ mv /etc/rcS.d/S12networking /etc/rcS.d/S11networking
 
 echo "MOS" > /etc/hostname
 
+mkdir -p /etc/target
+
 rm -rf /var/log/* /etc/ssh/*_key* /var/lib/lxc /var/lib/docker rm -rf /var/www/* /etc/init.d/.depend* /etc/nut/* /lib/udev/rules.d/85-hdparm.rules
 
 chown -R www-data:www-data /var/www
