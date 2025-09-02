@@ -95,8 +95,12 @@ find /usr/* -name "*.a" -exec rm -f {} \; 2>/dev/null
 rm -rf /usr/share/man /usr/share/doc /usr/share/doc-base /usr/share/info /usr/share/help
 rm -rf /usr/share/qemu/edk2-* /usr/bin/qemu-aarch64* /usr/bin/qemu-system-aarch64
 rm -rf /etc/network/interfaces /etc/network/interfaces.d
-touch $ROOTFS/etc/network/interfaces
+touch /etc/network/interfaces
 find /usr/share/locale -mindepth 1 -maxdepth 1 -type d ! -name "en*" ! -name "C" ! -name "POSIX" -exec rm -rf {} \;
 rm -rf /var/cache/apt/* /var/cache/apt/.*
+
+chown -R root:root /tmp/rootfs_files
+chmod -R 755 /tmp/rootfs_files
+cp -R /tmp/rootfs_files/* /
 
 exit
