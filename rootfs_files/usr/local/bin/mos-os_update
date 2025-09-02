@@ -3,6 +3,9 @@
 # Get current version
 CURRENT_VERSION=$(jq -r '"\(.mos.version)-\(.mos.channel)"' /etc/mos-release.json 2>/dev/null)
 
+# GH Token
+TOKEN="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"
+
 # Rollback to previous version
 rollback_mos() {
   # Get rollback version
@@ -92,7 +95,7 @@ if [ "$3" = "update_kernel" ] ; then
 
   # Download mos-release.json and check if download was successful
   curl -s -L \
-  --header "Authorization: Bearer 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" \
+  --header "Authorization: Bearer $TOKEN" \
   --header "Accept: application/octet-stream" \
   --header "X-GitHub-Api-Version: 2022-11-28" \
   --output "/tmp/mos-update/mos-$VERSION.json" \
@@ -111,7 +114,7 @@ if [ "$3" = "update_kernel" ] ; then
       echo "New recommended Kernel: $KERNEL"
       curl -s --request GET \
         --url "https://api.github.com/repos/ich777/mos-kernel/releases?per_page=100" \
-        --header "Authorization: Bearer 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" \
+        --header "Authorization: Bearer $TOKEN" \
         --header "X-GitHub-Api-Version: 2022-11-28" \
         -o /tmp/mos-update/$KERNEL.json
       # Get assed ID's for image/drivers and md5's
@@ -130,7 +133,7 @@ fi
 # Download rootfs
 echo "Downloading rootfs"
 curl --progress-bar -L \
-  --header "Authorization: Bearer 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" \
+  --header "Authorization: Bearer $TOKEN" \
   --header "Accept: application/octet-stream" \
   --header "X-GitHub-Api-Version: 2022-11-28" \
   --output "/tmp/mos-update/update/rootfs" \
@@ -139,7 +142,7 @@ curl --progress-bar -L \
 # Download rootfs.md5
 echo "Downloading rootfs.md5"
 curl -s -L \
-  --header "Authorization: Bearer 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" \
+  --header "Authorization: Bearer $TOKEN" \
   --header "Accept: application/octet-stream" \
   --header "X-GitHub-Api-Version: 2022-11-28" \
   --output "/tmp/mos-update/update/rootfs.md5" \
@@ -159,7 +162,7 @@ if [ "$UPDATE_KERNEL" = "true" ] ; then
   # Download kernel
   echo "Downloading Kernel image"
   curl --progress-bar -L \
-    --header "Authorization: Bearer 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" \
+    --header "Authorization: Bearer $TOKEN" \
     --header "Accept: application/octet-stream" \
     --header "X-GitHub-Api-Version: 2022-11-28" \
     --output "/tmp/mos-update/update/image" \
@@ -168,7 +171,7 @@ if [ "$UPDATE_KERNEL" = "true" ] ; then
   # Download drivers
   echo "Downloading Kernel drivers"
   curl --progress-bar -L \
-    --header "Authorization: Bearer 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" \
+    --header "Authorization: Bearer $TOKEN" \
     --header "Accept: application/octet-stream" \
     --header "X-GitHub-Api-Version: 2022-11-28" \
     --output "/tmp/mos-update/update/drivers" \
@@ -176,7 +179,7 @@ if [ "$UPDATE_KERNEL" = "true" ] ; then
 
   # Download kernel.md5
   curl -s -L \
-    --header "Authorization: Bearer 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" \
+    --header "Authorization: Bearer $TOKEN" \
     --header "Accept: application/octet-stream" \
     --header "X-GitHub-Api-Version: 2022-11-28" \
     --output "/tmp/mos-update/update/image.md5" \
@@ -184,7 +187,7 @@ if [ "$UPDATE_KERNEL" = "true" ] ; then
 
   # Download drivers.md5
   curl -s -L \
-    --header "Authorization: Bearer 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" \
+    --header "Authorization: Bearer $TOKEN" \
     --header "Accept: application/octet-stream" \
     --header "X-GitHub-Api-Version: 2022-11-28" \
     --output "/tmp/mos-update/update/drivers.md5" \
