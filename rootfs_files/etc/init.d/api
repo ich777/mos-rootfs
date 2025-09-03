@@ -71,6 +71,7 @@ check_admin() {
 # MOS custom: Pull latest version from mos-api on service start
 # Switch to pm2 at some point
 download_mosapi() {
+    TOKEN="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"
     if [ "$(ls -A /usr/local/lib/mos-api 2>/dev/null)" ] ; then
         rm -rf /usr/local/lib/mos-api/* /usr/local/lib/mos-api/.* 2>/dev/null
     fi
@@ -78,7 +79,7 @@ download_mosapi() {
       mkdir -p /usr/local/lib/mos-api
     fi
     cd /usr/local/lib/mos-api
-    git clone https://ba60a3c43e48516b67c694083dbd0910361aedfb:x-oauth-basic@git.minenet.at/ich777/mountainos-api-js.git --depth=1 . >/dev/null 2>&1
+    git clone https://oauth2:$TOKEN@github.com/ich777/mos-api.git --depth=1 . >/dev/null 2>&1
 }
 
 start_mosapi() {
