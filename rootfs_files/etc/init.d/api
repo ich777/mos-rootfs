@@ -23,51 +23,6 @@ PID="/run/mos-api.pid"
 . /lib/init/vars.sh
 . /lib/lsb/init-functions
 
-# Create admin function
-create_admin() {
-    TOKEN="$(cat /boot/config/api/token)"
-    RESULT="$(curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"username": "admin", "password": "admin", "role": "admin"}' http://localhost:3000/api/v1/auth/users)"
-    if [ -z "$RESULT" ] || [ ! "$(echo $RESULT | jq 'has("error")')" ] ; then
-        logger "MOS API: ERROR: Can't generate admin key"
-    else
-        rm -f /boot/config/api/token
-        touch /boot/config/api/token
-        sync
-        logger "MOS API: Initial Admin user created"
-    fi
-}
-
-# MOS custom: Make sure admin user is created when token is not
-# empty except if other admin users in users.json exist
-check_admin() {
-    sync
-    # Wait for API to become available
-    for i in $(seq 1 20); do
-        if curl -sf http://localhost:3000/health > /dev/null ; then
-            break
-        fi
-        sleep 1
-    done
-    if [ -s "/boot/config/api/token" ] ; then
-        if [ -f /boot/config/api/users.json ]; then
-            if [ "$(jq '.[] | select(.username == "admin")' /boot/config/api/users.json)" ] ; then
-                jq 'map(select(.username != "admin"))' /boot/config/api/users.json > /tmp/users.json && mv /tmp/users.json /boot/config/api/users.json
-            fi
-            if [ -z "$(jq '.[] | select(.role == "admin" and .user != "admin")' /boot/config/api/users.json)" ] ; then
-                log_daemon_msg "Creating admin user, please wait" "$NAME"
-                create_admin
-            else
-                rm -f /boot/config/api/token
-                touch /boot/config/api/token
-                sync
-            fi
-        else
-            log_daemon_msg "Creating admin user, please wait" "$NAME"
-            create_admin
-        fi
-    fi
-}
-
 # MOS custom: Pull latest version from mos-api on service start
 # Switch to pm2 at some point
 download_mosapi() {
@@ -96,7 +51,7 @@ case "$1" in
 		download_mosapi
 		start_mosapi
 		case "$?" in
-			0|1) log_end_msg 0; check_admin ;;
+			0|1) log_end_msg 0 ;;
 			2)   log_end_msg 1 ;;
 		esac
 		;;
@@ -117,7 +72,7 @@ case "$1" in
 			download_mosapi
 			start_mosapi
 			case "$?" in
-				0) log_end_msg 0; check_admin ;;
+				0) log_end_msg 0 ;;
 				1) log_end_msg 1 ;; # Old process is still running
 				*) log_end_msg 1 ;; # Failed to start
 			esac
