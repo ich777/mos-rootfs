@@ -22,27 +22,22 @@ on:
       docker_version:
         description: 'Docker Version'
         required: false
-        default: '28.3.3'
         type: string
       lxc_version:
         description: 'LXC Version'
         required: false
-        default: '6.0.5'
         type: string
       qemu_version:
         description: 'QEMU Version'
         required: false
-        default: '10.1.0'
         type: string
       mergerfs_version:
         description: 'mergerfs Version'
         required: false
-        default: '2.40.2'
         type: string
       snapraid_version:
         description: 'SnapRAID Version'
         required: false
-        default: '12.4'
         type: string
 
 jobs:
