@@ -222,8 +222,27 @@ start_iscsi_initiator() {
   fi
 }
 
+# Inject IP into /etc/issue
+modify_issue() {
+  MOS_V=$(jq -r '"\(.mos.version)-\(.mos.channel)"' /etc/mos-release.json)
+  echo -n '\n running MOS '"${MOS_V} - built on Devuan GNU/Linux" > /etc/issue
+  echo "" >> /etc/issue
+  for iface in eth0 br0; do
+    ipv4=$(ip -4 addr show "$iface" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
+    ipv6=$(ip -6 addr show "$iface" 2>/dev/null | grep -oP '(?<=inet6\s)[0-9a-f:]+(?=/64)' | grep -v '^fe80' | head -1)
+    if [ ! -z "$ipv4" ] || [ ! -z "$ipv6" ]; then
+      echo "" >> /etc/issue  # Eine Leerzeile
+      [ ! -z "$ipv4" ] && echo "  IPv4: $ipv4" >> /etc/issue
+      [ ! -z "$ipv6" ] && echo "  IPv6: $ipv6" >> /etc/issue
+      break
+    fi
+  done
+  echo "" >> /etc/issue
+}
+
 if [ "$1" = "os" ] ; then
   start_script
+  modify_issue
   start_ntp
   start_ssh
   start_iscsi_initiator
