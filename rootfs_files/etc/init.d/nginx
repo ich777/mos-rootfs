@@ -40,21 +40,28 @@ fi
 
 # MOS custom: development pull frontend
 mos_dev() {
-  # Get Download URL
-  DL_URL=$(curl -s -H "Authorization: Bearer ba60a3c43e48516b67c694083dbd0910361aedfb" \
-  "https://git.minenet.at/api/v1/repos/ich777/mos-frontend/releases/latest" \
-  | jq -r '.assets[].browser_download_url')
+  # Get Asset ID
+  TOKEN="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"
+  ASSET_ID=$(curl -s --request GET \
+    --url "https://api.github.com/repos/ich777/mos-frontend/releases/latest" \
+    --header "Authorization: Bearer $TOKEN" \
+    --header "X-GitHub-Api-Version: 2022-11-28" \
+    | jq -r '.assets[] | select(.name | startswith("mos-frontend") and endswith(".tar.gz")) | .id')
 
   # Remove WebUI
 	rm -rf /var/www/assets /var/www/index.html /var/www/mos* 2>/dev/null
 
   # Download and extract new WebUI
-  curl -s -L -H "Authorization: Bearer ba60a3c43e48516b67c694083dbd0910361aedfb" \
-  -o "/tmp/frontend.tar.gz" "$DL_URL"
+  curl --progress-bar -L \
+    --header "Authorization: Bearer $TOKEN" \
+    --header "Accept: application/octet-stream" \
+    --header "X-GitHub-Api-Version: 2022-11-28" \
+    --output "/tmp/frontend.tar.gz" \
+    "https://api.github.com/repos/ich777/mos-frontend/releases/assets/$ASSET_ID"
   tar -C /var/www/ -xf /tmp/frontend.tar.gz
 	rm -rf /tmp/frontend.tar.gz
 
-	mkdir -p /var/log/nginx
+	mkdir -p /var/log/nginx >/dev/null 2>&1
 }
 
 start_nginx() {
