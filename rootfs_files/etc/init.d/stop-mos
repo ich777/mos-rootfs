@@ -29,6 +29,20 @@ shutdown_script() {
 }
 
 stop_mos() {
+  CURRENT_RUNLEVEL=$(runlevel | cut -d' ' -f2)
+
+  if [ "$CURRENT_RUNLEVEL" = "0" ]; then
+    SHUTDOWN_SOUND=$(jq '.notification_sound.shutdown' /boot/config/system.json)
+    if [ "$SHUTDOWN_SOUND" != "null" ] && [ "$SHUTDOWN_SOUND" != "false" ] ; then
+      beep -f 659 -l 150 -n -f 587 -l 150 -n -f 523 -l 300
+    fi
+  elif [ "$CURRENT_RUNLEVEL" = "6" ]; then
+    REBOOT_SOUND=$(jq '.notification_sound.reboot' /boot/config/system.json)
+    if [ "$REBOOT_SOUND" != "null" ] && [ "$REBOOT_SOUND" != "false" ] ; then
+      beep -f 523 -l 150 -n -f 659 -l 150 -n -f 587 -l 200
+    fi
+  fi
+
   shutdown_script
 
   if [ -f /var/run/ntpd.pid ] ; then
