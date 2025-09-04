@@ -241,6 +241,10 @@ modify_issue() {
 }
 
 if [ "$1" = "os" ] ; then
+  STARTUP_SOUND=$(echo $SYSTEM_JSON | jq -r '.notification_sound.startup')
+  if [ "$STARTUP_SOUND" != "null" ] && [ "$STARTUP_SOUND" != "false" ] ; then
+    beep -f 500 -l 150 -n -f 580 -l 150
+  fi
   start_script
   modify_issue
   start_ntp
@@ -259,12 +263,14 @@ if [ "$1" = "os" ] ; then
   start_vm
   start_tailscale
   start_netbird
-  if [ ! -f /boot/dontpull ] ; then
-    start_nginx
-    start_api
-  fi
+  start_nginx
+  start_api
   mos_spindown
   end_script
+  STARTUP_SOUND=$(echo $SYSTEM_JSON | jq -r '.notification_sound.startup')
+  if [ "$STARTUP_SOUND" != "null" ] && [ "$STARTUP_SOUND" != "false" ] ; then
+    beep -f 523 -l 100 -n -f 587 -l 100 -n -f 659 -l 200
+  fi
 elif [ "$1" = "docker" ] ; then
   start_docker
   docker_network_check
