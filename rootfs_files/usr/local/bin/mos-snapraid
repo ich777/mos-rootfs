@@ -9,9 +9,23 @@ if [ -z "$2" ] ; then
   exit 1
 fi
 
-if [ -f /run/snapraid/$1.socket ] ; then
+if [ "$2" != "force_stop" ] && [ -f /run/snapraid/$1.socket ] ; then
   echo "ERROR: Operation for Pool: $2 already running"
   exit 1
+fi
+
+if [ "$2" = "force_stop" ] ; then
+  if [ -f /run/snapraid/$1.socket ] ; then
+    echo "Trying to stop currently running SnapRAID operation on Pool: $1"
+    kill -9 $(pgrep -f "snapraid -c /boot/config/snapraid/$1.conf") 2>/dev/null
+    kill -9 $(pgrep -f "mos-snapraid $1" | grep -v $$) 2>/dev/null
+    rm -f /run/snapraid/$1.socket
+    echo "SnapRAID operation forcefully stopped"
+    exit 0
+  else
+    echo "No SnapRAID operation for Pool: $1 running"
+    exit 0
+  fi
 fi
 
 POOL_INFO=$(jq --arg pool_name "$1" '.[] | select(.name == $pool_name)' /boot/config/pools.json)
@@ -37,20 +51,24 @@ done
 [ ! -d /run/snapraid ] && \
   mkdir -p /run/snapraid
 
-snapraid -c /boot/config/snapraid/$1.conf -l /var/log/snapraid/$1 $2 > /run/snapraid/$1.socket 2>&1
+{
+  snapraid -c /boot/config/snapraid/$1.conf -l /var/log/snapraid/$1 $2 > /run/snapraid/$1.socket 2>&1
 
-sync
-sleep 60
+  sync
+  sleep 180
 
-for disk_info in "${disk_array[@]}"; do
-  if [ "${disk_info##*:}" = "0" ] ; then
-    hdparm -y /dev/disk/by-uuid/${disk_info%%:*}
-  fi
-done
+  for disk_info in "${disk_array[@]}"; do
+    if [ "${disk_info##*:}" = "0" ] ; then
+      hdparm -y $(realpath /dev/disk/by-uuid/${disk_info%%:*})
+    fi
+  done
 
-for parity in $PARITY
-do
-  hdparm -y /dev/disk/by-uuid/$disk
-done
+  for parity in $PARITY
+  do
+    hdparm -y $(realpath /dev/disk/by-uuid/$parity)
+  done
 
-rm -f /run/snapraid/$1.socket
+  rm -f /run/snapraid/$1.socket
+} >/dev/null 2>&1 &
+
+echo "SnapRAID $2 for pool $1 started in background"
