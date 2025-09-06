@@ -193,7 +193,7 @@ jobs:
             --header "Authorization: Bearer ${{ secrets.MOS_TOKEN }}" \
             --header "X-GitHub-Api-Version: 2022-11-28")
 
-        # Define IMAGESHA_VERSION
+        # Define NOTIFY_VERSION
         NOTIFY_VERSION=$(echo $NOTIFY_JSON | jq -r '.[].tag_name' | sort -V | tail -1)
 
         # Get Asset IDs
