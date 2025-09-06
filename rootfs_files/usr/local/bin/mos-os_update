@@ -13,10 +13,10 @@ rollback_mos() {
 
   # Check if rollback version is in place
   if [ -f /boot/rollback/rootfs ] ; then
-    echo '{"message":"Rolling back to MOS version: '"$ROLLBACK_VERSION"', please wait...","priority":"normal"}' | nc -U /run/mos-notify.sock
+    notify -t "MOS Update" -m "Rolling back to MOS version: $ROLLBACK_VERSION" -p "normal"
     mv /boot/rollback/rootfs* /boot/
   else
-    echo '{"message":"No MOS release to roll back to found","priority":"alert"}' | nc -U /run/mos-notify.sock
+    notify -t "MOS Update" -m "No MOS release to roll back to found" -p "warning"
     exit 1
   fi
   
@@ -31,8 +31,9 @@ rollback_mos() {
       mv /boot/rollback/drivers* /boot/
     fi
   fi
-  rm -rf /boot/rollback
-  echo '{"message":"Rollback done, please reboot","priority":"normal"}' | nc -U /run/mos-notify.sock
+  # Not remove rollback directory for now
+  #rm -rf /boot/rollback
+  notify -t "MOS Update" -m "Rollback done, please reboot" -p "normal"
   exit 0
 }
 
@@ -74,7 +75,7 @@ mkdir -p /tmp/mos-update/update >/dev/null 2>&1
 if [ "$1" = "latest" ] ; then
   VERSION=$(jq --arg channel "$2" -r '.[] | select(.tag_name | contains($channel)) | .tag_name' /tmp/mos-update/releases.json | sort -V | tail -1)
   if [ -z "$VERSION" ] ; then
-    echo '{"message":"No latest MOS version in Channel '"$1"' found","priority":"alert"}' | nc -U /run/mos-notify.sock
+    notify -t "MOS Update" -m "No latest MOS version in Channel $1 found" -p "alert"
     exit 1
   fi
 else
@@ -83,10 +84,10 @@ fi
 
 # Display message if upgrading to the same version
 if [ "$VERSION" = "$CURRENT_VERSION" ] ; then
-  echo '{"message":"Version is the same as the current running MOS version, continung in 10 seconds","priority":"warning"}' | nc -U /run/mos-notify.sock
+  notify -t "MOS Update" -m "Version is the same as the current running MOS version, continung in 10 seconds" -p "warning"
   sleep 10
 else
-  echo '{"message":"Changing MOS version from: '"$CURRENT_VERSION"' to version: '"$VERSION"', please wait...","priority":"normal"}' | nc -U /run/mos-notify.sock
+  notify -t "MOS Update" -m "Changing MOS version from: $CURRENT_VERSION to version: $VERSION, please wait..." -p "alert"
 fi
 
 # Get assets ID's from rootfs and md5
@@ -107,7 +108,7 @@ if [ "$3" = "update_kernel" ] ; then
   "https://api.github.com/repos/ich777/mos-rootfs/releases/assets/$ASSET_RELEASE_JSON"
   EXIT_STATUS=$?
   if [ "$EXIT_STATUS" != "0" ] ; then
-    echo '{"message":"Something went wrong getting recommended Kernel version, not updating Kernel","priority":"warning"}' | nc -U /run/mos-notify.sock
+    notify -t "MOS Update" -m "Something went wrong getting recommended Kernel version, not updating Kernel" -p "warning"
     rm -f /tmp/mos-update/mos-$VERSION.json
     UPDATE_KERNEL="false"
   else
@@ -116,7 +117,7 @@ if [ "$3" = "update_kernel" ] ; then
     RUNNING_KERNEL=$(uname -r)
     # Compare if Kernel needs to be upgraded
     if [ "$RUNNING_KERNEL" != $KERNEL ] ; then
-      echo '{"message":"Upgrading Kernel to new recommended Kernel: '"$KERNEL"'","priority":"normal"}' | nc -U /run/mos-notify.sock
+      notify -t "MOS Update" -m "Upgrading Kernel to new recommended Kernel: $KERNEL" -p "normal"
       curl -s --request GET \
         --url "https://api.github.com/repos/ich777/mos-kernel/releases?per_page=100" \
         --header "Authorization: Bearer $TOKEN" \
@@ -129,8 +130,7 @@ if [ "$3" = "update_kernel" ] ; then
       ASSET_DRIVERS_MD5=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "drivers") | .id' /tmp/mos-update/$KERNEL.json)
       UPDATE_KERNEL="true"
     else
-      echo '{"message":"Kernel '"$RUNNING_KERNEL"' alread up-to-date","priority":"normal"}' | nc -U /run/mos-notify.sock
-      UPDATE_KERNEL="false"
+      notify -t "MOS Update" -m "Kernel '"$RUNNING_KERNEL"' alread up-to-date" -p "normal"
     fi
   fi
 fi
@@ -156,7 +156,7 @@ curl -s -L \
 # Verify checksum
 echo "Verifying md5 checksum from rootfs"
 if [ "$(md5sum /tmp/mos-update/update/rootfs | awk '{print $1}')" != "$(cat /tmp/mos-update/update/rootfs.md5)" ] ; then
-  echo '{"message":"rootfs checksum error, aborting MOS update","priority":"alert"}' | nc -U /run/mos-notify.sock
+  notify -t "MOS Update" -m "rootfs checksum error, aborting MOS update" -p "alert"
   rm -rf /tmp/mos-update/update
   exit 1
 else
@@ -201,7 +201,7 @@ if [ "$UPDATE_KERNEL" = "true" ] ; then
   # Verify checksum from image
   echo "Verifying md5 checksum from Kernel image"
   if [ "$(md5sum /tmp/mos-update/update/image | awk '{print $1}')" != "$(cat /tmp/mos-update/update/image.md5)" ] ; then
-    echo '{"message":"Kernel image checksum error, not updating Kernel","priority":"warning"}' | nc -U /run/mos-notify.sock
+    notify -t "MOS Update" -m "Kernel image checksum error, not updating Kernel" -p "warning"
     rm -f /tmp/mos-update/update/image* /tmp/mos-update/update/drivers*
     UPDATE_KERNEL="false"
   else
@@ -211,7 +211,7 @@ if [ "$UPDATE_KERNEL" = "true" ] ; then
   # Verify checksum from drivers
   echo "Verifying md5 checksum from Kernel drivers"
   if [ "$(md5sum /tmp/mos-update/update/drivers | awk '{print $1}')" != "$(cat /tmp/mos-update/update/drivers.md5)" ] ; then
-    echo '{"message":"Kernel drivers checksum error, not updating Kernel","priority":"warning"}' | nc -U /run/mos-notify.sock
+    notify -t "MOS Update" -m "Kernel drivers checksum error, not updating Kernel" -p "warning"
     rm -f /tmp/mos-update/update/image* /tmp/mos-update/update/drivers*
     UPDATE_KERNEL="false"
   else
@@ -219,4 +219,4 @@ if [ "$UPDATE_KERNEL" = "true" ] ; then
   fi
 fi
 
-echo '{"message":"MOS update done, please reboot","priority":"nromal"}' | nc -U /run/mos-notify.sock
+notify -t "MOS Update" -m "MOS update done, please reboot" -p "normal"
