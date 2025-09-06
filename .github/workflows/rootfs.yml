@@ -187,6 +187,19 @@ jobs:
         IMAGESHA_DEB=$(echo $IMAGESHA_JSON | jq --arg version v${IMAGESHA_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-image-sha") and endswith(".deb")) | .id')
         IMAGESHA_DEB_MD5=$(echo $IMAGESHA_JSON | jq --arg version v${IMAGESHA_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-image-sha") and endswith(".deb.md5")) | .id')
 
+        # Get image-sha Releases
+        NOTIFY_JSON=$(curl -s --request GET \
+            --url "https://api.github.com/repos/ich777/mos-notify/releases?per_page=50" \
+            --header "Authorization: Bearer ${{ secrets.MOS_TOKEN }}" \
+            --header "X-GitHub-Api-Version: 2022-11-28")
+
+        # Define IMAGESHA_VERSION
+        NOTIFY_VERSION=$(echo $NOTIFY_JSON | jq -r '.[].tag_name' | sort -V | tail -1)
+
+        # Get Asset IDs
+        NOTIFY_DEB=$(echo $NOTIFY_JSON | jq --arg version v${NOTIFY_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-notify") and endswith(".deb")) | .id')
+        NOTIFY_DEB_MD5=$(echo $NOTIFY_JSON | jq --arg version v${NOTIFY_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-notify") and endswith(".deb.md5")) | .id')
+
         # Get docker-watchdog Releases
         DOCKERWD_JSON=$(curl -s --request GET \
             --url "https://api.github.com/repos/ich777/mos-docker-watchdog/releases?per_page=50" \
@@ -213,6 +226,8 @@ jobs:
         application_download "mergerfs" "${MERGERFS_VERSION#v}" "$MERGERFS_DEB_MD5" ".md5"
         application_download "image-sha" "${IMAGESHA_VERSION#v}" "$IMAGESHA_DEB"
         application_download "image-sha" "${IMAGESHA_VERSION#v}" "$IMAGESHA_DEB_MD5" ".md5"
+        application_download "mos-notify" "${NOTIFY_VERSION#v}" "$NOTIFY_DEB"
+        application_download "mos-notify" "${NOTIFY_VERSION#v}" "$NOTIFY_DEB_MD5" ".md5"
         application_download "docker-watchdog" "${DOCKERWD_VERSION#v}" "$DOCKERWD_DEB"
         application_download "docker-watchdog" "${DOCKERWD_VERSION#v}" "$DOCKERWD_DEB_MD5" ".md5"
 
