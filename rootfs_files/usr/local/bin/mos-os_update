@@ -86,8 +86,9 @@ fi
 if [ "$VERSION" = "$CURRENT_VERSION" ] ; then
   notify -t "MOS Update" -m "Version is the same as the current running MOS version, continung in 10 seconds" -p "warning"
   sleep 10
+  notify -t "MOS Update" -m "Redownloading and installing MOS version: $VERSION, you will be notified when it is safe to reboot" -p "alert"
 else
-  notify -t "MOS Update" -m "Changing MOS version from: $CURRENT_VERSION to version: $VERSION, please wait..." -p "alert"
+  notify -t "MOS Update" -m "Changing MOS version from: $CURRENT_VERSION to version: $VERSION, you will be notified when it is safe to reboot" -p "alert"
 fi
 
 # Get assets ID's from rootfs and md5
@@ -130,7 +131,7 @@ if [ "$3" = "update_kernel" ] ; then
       ASSET_DRIVERS_MD5=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "drivers") | .id' /tmp/mos-update/$KERNEL.json)
       UPDATE_KERNEL="true"
     else
-      notify -t "MOS Update" -m "Kernel '"$RUNNING_KERNEL"' alread up-to-date" -p "normal"
+      notify -t "MOS Update" -m "Nothing to do for Kernel, already up-to-date" -p "normal"
     fi
   fi
 fi
