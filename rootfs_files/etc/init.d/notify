@@ -32,14 +32,21 @@ stop_notify() {
 }
 
 case "$1" in
-	start)
-		log_daemon_msg "Starting $DESC" "$NAME"
-		start_notify
-		log_end_msg 0
-		;;
+  start)
+  log_daemon_msg "Starting $DESC" "$NAME"
+  start_notify
+  log_end_msg 0
+  ;;
   stop)
-		log_daemon_msg "Stopping $DESC" "$NAME"
+	log_daemon_msg "Stopping $DESC" "$NAME"
     stop_notify
+    log_end_msg 0
+    ;;
+  restart)
+	log_daemon_msg "Restarting $DESC" "$NAME"
+    stop_notify
+	sleep 1
+	start_notify
     log_end_msg 0
     ;;
 esac
