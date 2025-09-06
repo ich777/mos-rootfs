@@ -226,8 +226,8 @@ jobs:
         application_download "mergerfs" "${MERGERFS_VERSION#v}" "$MERGERFS_DEB_MD5" ".md5"
         application_download "image-sha" "${IMAGESHA_VERSION#v}" "$IMAGESHA_DEB"
         application_download "image-sha" "${IMAGESHA_VERSION#v}" "$IMAGESHA_DEB_MD5" ".md5"
-        application_download "mos-notify" "${NOTIFY_VERSION#v}" "$NOTIFY_DEB"
-        application_download "mos-notify" "${NOTIFY_VERSION#v}" "$NOTIFY_DEB_MD5" ".md5"
+        application_download "notify" "${NOTIFY_VERSION#v}" "$NOTIFY_DEB"
+        application_download "notify" "${NOTIFY_VERSION#v}" "$NOTIFY_DEB_MD5" ".md5"
         application_download "docker-watchdog" "${DOCKERWD_VERSION#v}" "$DOCKERWD_DEB"
         application_download "docker-watchdog" "${DOCKERWD_VERSION#v}" "$DOCKERWD_DEB_MD5" ".md5"
 
