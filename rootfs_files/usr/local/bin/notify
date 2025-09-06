@@ -1,0 +1,93 @@
+#!/bin/bash
+
+# Define variables
+SOCKET="/run/mos-notify.sock"
+TITLE=""
+MESSAGE=""
+PRIORITY="normal"
+JSON_MODE=false
+
+show_help() {
+  echo "MOS Notification Wrapper"
+  echo "Usage:"
+  echo "  notify \"Simple message\""
+  echo "  notify -t \"Title\" -m \"Message\" [-p priority]"
+  echo "  notify -j '{\"title\":\"Test\",\"message\":\"Hello\",\"priority\":\"normal\"}'"
+  echo ""
+  echo "Options:"
+  echo "  -t, --title     Message title"
+  echo "  -m, --message   Message text"
+  echo "  -p, --priority  Priority (normal|warning|alert)"
+  echo "  -j, --json      Send raw JSON"
+  echo "  -h, --help      Show this help"
+  echo ""
+  echo "Examples:"
+  echo "  notify \"Server is running\""
+  echo "  notify -t \"Backup\" -m \"Backup completed successfully\""
+  echo "  notify -t \"Error\" -m \"Disk space low\" -p alert"
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -t|--title)
+      TITLE="$2"
+      shift 2
+      ;;
+    -m|--message)
+      MESSAGE="$2"
+      shift 2
+      ;;
+    -p|--priority)
+      PRIORITY="$2"
+      shift 2
+      ;;
+    -j|--json)
+      JSON_MODE=true
+      MESSAGE="$2"
+      shift 2
+      ;;
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    -*)
+      echo "Unknown option: $1"
+      show_help
+      exit 1
+      ;;
+    *)
+      # If no options provided, treat as simple message
+      if [[ -z "$MESSAGE" && -z "$TITLE" ]]; then
+        MESSAGE="$1"
+      fi
+      shift
+      ;;
+    esac
+done
+
+# Check if socket exists
+if [[ ! -S "$SOCKET" ]]; then
+  echo "Error: MOS Notify socket not found at $SOCKET"
+  echo "Make sure mos-notify service is running"
+  exit 1
+fi
+
+# Send message
+if [[ "$JSON_MODE" == true ]]; then
+  echo "$MESSAGE" | nc -U "$SOCKET"
+elif [[ -n "$TITLE" || -n "$MESSAGE" ]]; then
+  JSON_MSG=$(cat <<EOF
+{
+  "title": "$TITLE",
+  "message": "$MESSAGE",
+  "priority": "$PRIORITY"
+}
+EOF
+)
+  echo "$JSON_MSG" | nc -U "$SOCKET"
+else
+  echo "Error: No message provided"
+  show_help
+  exit 1
+fi
