@@ -73,7 +73,7 @@ done
 
 if [ -z "$1" ] ; then
   if [ ! -z "$CONTAINER_UPDATES" ] ; then
-    MSG_UPDATES=$(IFS=','; echo "${CONTAINER_UPDATES[*]}")
+    MSG_UPDATES=$(IFS=', '; echo "${CONTAINER_UPDATES[*]}")
     notify -t "Docker Update Check" -m "Docker Update Check finished, found updates for containers: $MSG_UPDATES" -p "normal"
   else
     notify -t "Docker Update Check" -m "Docker Update Check finished, all containers up to date" -p "normal"
