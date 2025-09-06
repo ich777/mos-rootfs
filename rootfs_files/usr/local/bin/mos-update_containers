@@ -3,6 +3,8 @@
 REMOVE_LAYERS=${REMOVE_LAYERS:-true}
 
 if [ -z "$1" ] ; then
+  CONTAINER_UPDATES=()
+  notify -t "Docker Updates" -m "Docker Updates started in background, you will be notified when the updates are finished." -p "normal"
   CONTAINERS_JSON=$(cat /var/lib/docker/mos/containers)
   CONTAINER_NAMES=$(echo $CONTAINERS_JSON | jq -r '.[].name')
 else
@@ -26,14 +28,17 @@ do
     fi
     cd /boot/config/system/docker/templates
     mos-deploy_docker "$container.json" "update_container"
+    CONTAINER_UPDATES+=("$container")
   else
     echo "Nothing to do for $container"
   fi
 done
 
-
-
-
-
-
-
+if [ -z "$1" ] ; then
+  if [ ! -z "$CONTAINER_UPDATES" ] ; then
+    MSG_UPDATES=$(IFS=','; echo "${CONTAINER_UPDATES[*]}")
+    notify -t "Docker Updates" -m "Docker Updates finished, following containers where updated: " -p "normal"
+  else
+    notify -t "Docker Updates" -m "Nothing to do, all container already up to date" -p "normal"
+  fi
+fi
