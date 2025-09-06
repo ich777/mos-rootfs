@@ -24,6 +24,10 @@ end_script() {
   fi
 }
 
+start_notify() {
+  /etc/init.d/notify start
+}
+
 start_ssh() {
   SSH_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.ssh.enabled')
   if [ "$SSH_ENABLED" = "true" ] ; then
@@ -245,6 +249,7 @@ if [ "$1" = "os" ] ; then
   if [ "$STARTUP_SOUND" != "null" ] && [ "$STARTUP_SOUND" != "false" ] ; then
     beep -f 500 -l 150 -n -f 580 -l 150
   fi
+  start_notify
   start_script
   modify_issue
   start_ntp
