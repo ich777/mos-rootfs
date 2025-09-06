@@ -28,6 +28,7 @@ start_notify() {
 
 stop_notify() {
     start-stop-daemon --stop --pidfile "$PID"
+	rm -f /run/mos-notify.sock
 }
 
 case "$1" in
