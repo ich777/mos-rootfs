@@ -1,6 +1,8 @@
 #!/bin/sh
 
 if [ -z "$1" ] ; then
+  CONTAINER_UPDATES=()
+  notify -t "Docker Update Check" -m "Docker Update Check started in background, you will be notified when the check finished." -p "normal"
   CONTAINERS_JSON=$(cat /var/lib/docker/mos/containers)
   CONTAINER_NAMES=$(echo $CONTAINERS_JSON | jq -r '.[].name')
 else
@@ -63,9 +65,19 @@ do
     else
       logger --tag "mos-docker_update_check" "Update pending for container $container"
     fi
+    CONTAINER_UPDATES+=("$container")
   else
     echo "Nothing to do for container $container"
   fi
 done
+
+if [ -z "$1" ] ; then
+  if [ ! -z "$CONTAINER_UPDATES" ] ; then
+    MSG_UPDATES=$(IFS=','; echo "${CONTAINER_UPDATES[*]}")
+    notify -t "Docker Update Check" -m "Docker Update Check finished, found updates for containers: $MSG_UPDATES" -p "normal"
+  else
+    notify -t "Docker Update Check" -m "Docker Update Check finished, all containers up to date" -p "normal"
+  fi
+fi
 
 sync
