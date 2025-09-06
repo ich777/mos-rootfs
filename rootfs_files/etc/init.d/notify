@@ -1,0 +1,44 @@
+#!/bin/sh -e
+# MOS custom
+
+### BEGIN INIT INFO
+# Provides:          notify
+# Required-Start:    $local_fs
+# Required-Stop:     $local_fs
+# Default-Start:     S
+# Default-Stop:      0 6
+# Short-Description: Run mos-ntofiy
+# Description:       Run mos-ntofiy
+### END INIT INFO
+
+PATH="/sbin:/bin:/usr/sbin:/usr/bin"
+DAEMON="/usr/bin/mos-notify"
+DESC="MOS Notify"
+NAME="mos-notify"
+USER="root"
+
+PID="/run/mos-notify.pid"
+
+. /lib/init/vars.sh
+. /lib/lsb/init-functions
+
+start_notify() {
+    start-stop-daemon --start --background --make-pidfile --pidfile $PID --user $USER --exec "$DAEMON" -- $ARGS >/dev/null 2>&1
+}
+
+stop_notify() {
+    start-stop-daemon --stop --pidfile "$PID"
+}
+
+case "$1" in
+	start)
+		log_daemon_msg "Starting $DESC" "$NAME"
+		start_notify
+		log_end_msg 0
+		;;
+  stop)
+		log_daemon_msg "Stopping $DESC" "$NAME"
+    stop_notify
+    log_end_msg 0
+    ;;
+esac
