@@ -20,7 +20,8 @@ if [ "$2" = "force_stop" ] ; then
     kill -9 $(pgrep -f "snapraid -c /boot/config/snapraid/$1.conf") 2>/dev/null
     kill -9 $(pgrep -f "mos-snapraid $1" | grep -v $$) 2>/dev/null
     rm -f /run/snapraid/$1.socket
-    echo "SnapRAID operation forcefully stopped"
+    notify -t "SnapRAID" -m "SnapRAID operation for Pool $1 forcfully stopped" -p "warning"
+    echo "SnapRAID operation for Pool: $1 forcefully stopped"
     exit 0
   else
     echo "No SnapRAID operation for Pool: $1 running"
@@ -52,6 +53,7 @@ done
   mkdir -p /run/snapraid
 
 {
+  notify -t "SnapRAID" -m "Starting SnapRAID operation $2 for Pool: $1" -p "normal"
   snapraid -c /boot/config/snapraid/$1.conf -l /var/log/snapraid/$1 $2 > /run/snapraid/$1.socket 2>&1
 
   sync
@@ -67,6 +69,8 @@ done
   do
     hdparm -y $(realpath /dev/disk/by-uuid/$parity)
   done
+
+  notify -t "SnapRAID" -m "SnapRAID operation $2 for Pool: $1 completed" -p "normal"
 
   rm -f /run/snapraid/$1.socket
 } >/dev/null 2>&1 &
