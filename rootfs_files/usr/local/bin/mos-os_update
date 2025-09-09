@@ -120,27 +120,27 @@ if [ "$3" = "update_kernel" ] ; then
     # Extract recommended Kernel version
     KERNEL=$(jq -r '.mos.recommended_kernel' /var/mos/mos-update/mos-$VERSION.json)
     RUNNING_KERNEL=$(uname -r)
+    curl -s --request GET \
+      --url "https://api.github.com/repos/ich777/mos-kernel/releases?per_page=100" \
+      --header "Authorization: Bearer $TOKEN" \
+      --header "X-GitHub-Api-Version: 2022-11-28" \
+        -o /var/mos/mos-update/$KERNEL.json
     # Compare if Kernel needs to be upgraded
     if [ "$RUNNING_KERNEL" != $KERNEL ] ; then
       notify -t "MOS Update" -m "Upgrading Kernel to new recommended Kernel: $KERNEL" -p "normal"
-      curl -s --request GET \
-        --url "https://api.github.com/repos/ich777/mos-kernel/releases?per_page=100" \
-        --header "Authorization: Bearer $TOKEN" \
-        --header "X-GitHub-Api-Version: 2022-11-28" \
-        -o /var/mos/mos-update/$KERNEL.json
       # Get assed ID's for image/drivers and md5's
       ASSET_KERNEL=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "image") | .id' /var/mos/mos-update/$KERNEL.json)
       ASSET_DRIVERS=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "drivers") | .id' /var/mos/mos-update/$KERNEL.json)
       ASSET_KERNEL_MD5=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "image") | .id' /var/mos/mos-update/$KERNEL.json)
       ASSET_DRIVERS_MD5=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "drivers") | .id' /var/mos/mos-update/$KERNEL.json)
-      # Get assets ID's from microcode and md5
-      ASSET_MICROCODE=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "microcode") | .id' /var/mos/mos-update/$KERNEL.json)
-      ASSET_MICROCODE_MD5=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "microcode.md5") | .id' /var/mos/mos-update/$KERNEL.json)
-      UPDATE_MICROCODE="true"
       UPDATE_KERNEL="true"
     else
       notify -t "MOS Update" -m "No Kernel update needed, continuing with upgrade" -p "normal"
     fi
+    # Get assets ID's from microcode and md5
+    ASSET_MICROCODE=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "microcode") | .id' /var/mos/mos-update/$KERNEL.json)
+    ASSET_MICROCODE_MD5=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "microcode.md5") | .id' /var/mos/mos-update/$KERNEL.json)
+    UPDATE_MICROCODE="true"
   fi
 fi
 
@@ -271,20 +271,27 @@ if [ "$CURRENT_VERSION" != "$ROLLBACK_VERSION" ] ; then
   fi
   mv /boot/rootfs* /boot/rollback/
   cp /etc/mos-release.json /boot/rollback/
-  mv /var/mos/mos-update/update/rootfs* /boot/
+
 
   if [ "$UPDATE_KERNEL" = "true" ] ; then
     echo "Moving Kernel image and drivers to /boot/rollback"
     mv /boot/image* /boot/drivers* /boot/rollback/
-    mv /var/mos/mos-update/update/image* /var/mos/mos-update/update/drivers* /boot/
   fi
   if [ "$UPDATE_MICROCODE" = "true" ] ; then
     echo "Moving microcode to /boot/rollback"
     mv /boot/microcode* /boot/rollback/
-    mv /var/mos/mos-update/update/microcode* /boot/
   fi
 else
-  echo "INFO: Rollback MOS version already in palce"
+  echo "Rollback MOS version already in palce"
+fi
+
+echo "Moving files into place, please wait"
+mv /var/mos/mos-update/update/rootfs* /boot/
+if [ "$UPDATE_KERNEL" = "true" ] ; then
+  mv /var/mos/mos-update/update/image* /var/mos/mos-update/update/drivers* /boot/
+fi
+if [ "$UPDATE_MICROCODE" = "true" ] ; then
+  mv /var/mos/mos-update/update/microcode* /boot/
 fi
 
 notify -t "MOS Update" -m "MOS update done, please reboot" -p "normal"
