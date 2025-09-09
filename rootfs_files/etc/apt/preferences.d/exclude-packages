@@ -1,0 +1,67 @@
+Package: docker*
+Pin: version *
+Pin-Priority: -1
+
+Package: runc*
+Pin: version *
+Pin-Priority: -1
+
+Package: containerd*
+Pin: version *
+Pin-Priority: -1
+
+Package: tini*
+Pin: version *
+Pin-Priority: -1
+
+Package: qemu*
+Pin: version *
+Pin-Priority: -1
+
+Package: libvirt*
+Pin: version *
+Pin-Priority: -1
+
+Package: virt-manager*
+Pin: version *
+Pin-Priority: -1
+
+Package: seabios*
+Pin: version *
+Pin-Priority: -1
+
+Package: ovmf*
+Pin: version *
+Pin-Priority: -1
+
+Package: libtpms*
+Pin: version *
+Pin-Priority: -1
+
+Package: swtpm*
+Pin: version *
+Pin-Priority: -1
+
+Package: lxc*
+Pin: version *
+Pin-Priority: -1
+
+Package: lxd*
+Pin: version *
+Pin-Priority: -1
+
+Package: snapraid*
+Pin: version *
+Pin-Priority: -1
+
+Package: nodejs*
+Pin: version *
+Pin-Priority: -1
+
+Package: npm*
+Pin: version *
+Pin-Priority: -1
+
+Package: mergerfs*
+Pin: version *
+Pin-Priority: -1
