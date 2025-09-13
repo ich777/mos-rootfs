@@ -78,6 +78,8 @@ usermod -a -G kvm,libvirt-qemu libvirt-qemu
 groupadd -g 115 -r docker
 usermod -a -G nut nut
 
+groupdel sambashare
+
 cd /etc
 ln -sf /proc/mounts mtab
 
