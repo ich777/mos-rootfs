@@ -223,6 +223,7 @@ start_iscsi_initiator() {
   if [ "$ISCSI_INITIATOR_ENABLED" = "true" ] ; then
     /etc/init.d/iscsid start
     /usr/local/bin/mos-iscsid_mount >/dev/null 2>&1 &
+    sleep 2
   fi
 }
 
