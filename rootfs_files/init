@@ -36,12 +36,6 @@ if [ -f /boot/script.sh ] ; then
   /tmp/script.sh
 fi
 
-# Install driver packages
-OPTIONAL_DRIVERS="$(/bin/ls -1 /boot/optional/drivers/*.json 2>/dev/null)"
-if [ ! -z "$OPTIONAL_DRIVERS" ] ; then
-  /bin/echo "TODO"
-fi
-
 # Create directories
 /bin/mkdir -p /lib/firmware /lib/modules /var/overlay/lower/drivers
 for dir in upper work; do
@@ -58,6 +52,19 @@ done
 /bin/mount -t overlay overlay -o lowerdir=/var/overlay/lower/drivers/firmware,upperdir=/var/overlay/upper/firmware,workdir=/var/overlay/work/firmware /lib/firmware
 /bin/mount -t overlay overlay -o lowerdir=/var/overlay/lower/drivers/modules,upperdir=/var/overlay/upper/modules,workdir=/var/overlay/work/modules /lib/modules
 
+# Copy over modprobe.d files if found
+MODPROBED_FILES="$(/bin/ls -1 /boot/optional/modprobe.d/* 2>/dev/null)"
+if [ ! -z "$MODPROBED_FILES" ] ; then
+  /bin/echo "Installing modprobe.d files"
+  if [ ! -d /etc/modprobe.d ] ; then
+    mkdir -p /etc/modprobe.d
+  fi
+  for modprobed_file in $MODPROBED_FILES
+  do
+    /bin/cp $modprobed_file /etc/modprobe.d
+  done
+fi
+
 # Install optional drivers
 UNAME=$(/bin/uname -r)
 DRIVERS=$(/bin/ls -1 /boot/optional/drivers/*/${UNAME}/*-${UNAME}.deb 2>/dev/null)
@@ -66,7 +73,7 @@ if [ ! -z "$DRIVERS" ] ; then
   for driver in $DRIVERS
   do
     /bin/echo "Installing driver: $(/bin/echo $driver | /usr/bin/rev | /usr/bin/cut -d '/' -f1 | /usr/bin/rev)"
-    PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" /usr/bin/dpkg --install $driver
+    PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" /usr/bin/dpkg --install $driver >/dev/null
   done
   /sbin/depmod --all
 fi
