@@ -35,8 +35,8 @@ rollback_mos() {
       mv /boot/rollback/microcode* /boot/
     fi
   fi
-  # Not remove rollback directory for now
-  #rm -rf /boot/rollback
+
+  rm -rf /boot/rollback
   notify -t "MOS Update" -m "Rollback done, please reboot" -p "normal"
   exit 0
 }
@@ -252,7 +252,7 @@ if [ "$UPDATE_MICROCODE" = "true" ] ; then
   echo "Verifying md5 checksum from microcode"
   if [ "$(md5sum /var/mos/mos-update/update/microcode | awk '{print $1}')" != "$(cat /var/mos/mos-update/update/microcode.md5)" ] ; then
     notify -t "MOS Update" -m "microcode checksum error, not updating microcode" -p "alert"
-    rm -rf /var/mos/mos-update/microcode*
+    rm -rf /var/mos/mos-update/update/microcode*
   else
     echo "microcode checksum OK"
   fi
