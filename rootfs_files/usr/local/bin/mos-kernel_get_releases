@@ -1,0 +1,36 @@
+#!/bin/sh
+
+mkdir -p /var/mos/mos-update/kernel >/dev/null 2>&1
+
+# Get last 50 Kernel releases:
+get_releases() {
+  echo "Trying to get MOS Kernels"
+  TOKEN="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"
+  curl -s --request GET \
+    --url "https://api.github.com/repos/ich777/mos-kernel/releases?per_page=50" \
+    --header "Authorization: Bearer $TOKEN" \
+    --header "X-GitHub-Api-Version: 2022-11-28" \
+    -o /var/mos/mos-update/kernel/releases.json
+  EXIT_STATUS=$?
+  if [ "$EXIT_STATUS" != "0" ] ; then
+    echo "Something went wrong gathering MOS Kernels"
+    exit 1
+  else
+    echo "Download from MOS Kernels successful!"
+  fi
+}
+
+if [ ! -f /var/mos/mos-update/kernel/releases.json ] ; then
+  get_releases
+else
+  CURENTTIME=$(date +%s)
+  FILETIME=$(stat /var/mos/mos-update/kernel/releases.json -c %Y)
+  DIFF=$(expr $CURENTTIME - $FILETIME)
+  CHK_TIMEOUT=300
+  if [ $DIFF -gt $CHK_TIMEOUT ] ; then
+    rm -f /var/mos/mos-update/kernel/releases.json
+    get_releases
+  else
+    echo "Kernel releases.json up to date, try again in a few minutes"
+  fi
+fi
