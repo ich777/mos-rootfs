@@ -1,0 +1,197 @@
+#!/bin/sh
+
+# Get current version
+CURRENT_VERSION=$(uname -r 2>/dev/null)
+
+# GH Token
+TOKEN="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"
+
+# Rollback to previous version
+rollback_mos() {
+  # Get rollback version
+  ROLLBACK_VERSION=$(jq -r '.kernel_version' /boot/rollback/kernel/version.json 2>/dev/null)
+
+  # Check if rollback version is in place
+  if [ -f /boot/rollback/kernel/image ] ; then
+    notify -t "MOS Kernel" -m "Rolling back to Kernel version: $ROLLBACK_VERSION" -p "normal"
+    mv /boot/rollback/kernel/image* /boot/
+    mv /boot/rollback/kernel/drivers* /boot/
+    mv /boot/rollback/kernel/microcode* /boot/
+  else
+    notify -t "MOS Kernel" -m "No Kernel version to roll back to found" -p "warning"
+    exit 1
+  fi
+
+  rm -rf /boot/rollback/kernel
+  notify -t "MOS Kernel" -m "Kernel rollback done, please reboot" -p "normal"
+  exit 0
+}
+
+# Check if passed over argument is either "latest" or starting
+# with a semantic version or if "rollback_mos" is passed over
+case "$1" in
+  recommended)
+    ;;
+  [0-9]*.[0-9]*.[0-9]*-mos)
+    ;;
+  rollback)
+    rollback_mos
+    ;;
+  *)
+    echo "Please specify either a valid Kernel version recommended or rollback"
+    exit 1
+    ;;
+esac
+
+# Call mos-os_get_releases to get available MOS versions
+if ! /usr/local/bin/mos-kernel_get_releases ; then
+  exit 1
+fi
+
+# Create necessary directories
+mkdir -p /var/mos/mos-update/kernel/update >/dev/null 2>&1
+
+# Set version depending on which argument is passed over
+if [ "$1" = "recommended" ] ; then
+  VERSION=$(jq -r '.mos.recommended_kernel' /etc/mos-release.json)
+  if [ -z "$VERSION" ] ; then
+    notify -t "MOS Kernel" -m "No recommended Kernel found, strange please help" -p "alert"
+    exit 1
+  fi
+else
+  VERSION="$1"
+fi
+
+# Display message if upgrading to the same version
+if [ "$VERSION" = "$CURRENT_VERSION" ] ; then
+  notify -t "MOS Kernel" -m "Kernel is the same as the current running version, continung in 10 seconds" -p "warning"
+  sleep 10
+  notify -t "MOS Kernel" -m "Redownloading and installing MOS Kernel: $VERSION, you will be notified when it is safe to reboot" -p "normal"
+else
+  if [ "$VERSION" != "$(jq -r '.mos.recommended_kernel' /etc/mos-release.json)" ] ; then
+    notify -t "MOS Kernel" -m "Changing Kernel version from: $CURRENT_VERSION to version: $VERSION, you will be notified when it is safe to reboot. Please note that running a non recommended Kernel versions can lead to instability." -p "warning"
+  else
+    notify -t "MOS Kernel" -m "Changing Kernel version from: $CURRENT_VERSION to version: $VERSION, you will be notified when it is safe to reboot" -p "normal"
+  fi
+fi
+
+# Get assets ID's from rootfs and md5
+ASSET_KERNEL=$(jq --arg kernel $VERSION -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "image") | .id' /var/mos/mos-update/kernel/releases.json)
+ASSET_DRIVERS=$(jq --arg kernel $VERSION -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "drivers") | .id' /var/mos/mos-update/kernel/releases.json)
+ASSET_KERNEL_MD5=$(jq --arg kernel $VERSION -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "image") | .id' /var/mos/mos-update/kernel/releases.json)
+ASSET_DRIVERS_MD5=$(jq --arg kernel $VERSION -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "drivers") | .id' /var/mos/mos-update/kernel/releases.json)
+ASSET_MICROCODE=$(jq --arg kernel $VERSION -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "microcode") | .id' /var/mos/mos-update/kernel/releases.json)
+ASSET_MICROCODE_MD5=$(jq --arg kernel $VERSION -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "microcode.md5") | .id' /var/mos/mos-update/kernel/releases.json)
+
+# Download kernel
+echo "Downloading Kernel image"
+curl --progress-bar -L \
+  --header "Authorization: Bearer $TOKEN" \
+  --header "Accept: application/octet-stream" \
+  --header "X-GitHub-Api-Version: 2022-11-28" \
+  --output "/var/mos/mos-update/kernel/update/image" \
+  "https://api.github.com/repos/ich777/mos-kernel/releases/assets/$ASSET_KERNEL"
+
+# Download drivers
+echo "Downloading Kernel drivers"
+curl --progress-bar -L \
+  --header "Authorization: Bearer $TOKEN" \
+  --header "Accept: application/octet-stream" \
+  --header "X-GitHub-Api-Version: 2022-11-28" \
+  --output "/var/mos/mos-update/kernel/update/drivers" \
+  "https://api.github.com/repos/ich777/mos-kernel/releases/assets/$ASSET_DRIVERS"
+
+# Download kernel.md5
+curl -s -L \
+  --header "Authorization: Bearer $TOKEN" \
+  --header "Accept: application/octet-stream" \
+  --header "X-GitHub-Api-Version: 2022-11-28" \
+  --output "/var/mos/mos-update/kernel/update/image.md5" \
+  "https://api.github.com/repos/ich777/mos-kernel/releases/assets/$ASSET_KERNEL_MD5"
+
+# Download drivers.md5
+curl -s -L \
+  --header "Authorization: Bearer $TOKEN" \
+  --header "Accept: application/octet-stream" \
+  --header "X-GitHub-Api-Version: 2022-11-28" \
+  --output "/var/mos/mos-update/kernel/update/drivers.md5" \
+  "https://api.github.com/repos/ich777/mos-kernel/releases/assets/$ASSET_DRIVERS_MD5"
+
+# Verify checksum from image
+echo "Verifying md5 checksum from Kernel image"
+if [ "$(md5sum /var/mos/mos-update/kernel/update/image | awk '{print $1}')" != "$(cat /var/mos/mos-update/kernel/update/image.md5)" ] ; then
+  notify -t "MOS Kernel" -m "Kernel image checksum error, not updating Kernel" -p "warning"
+  rm -f /var/mos/mos-update/kernel/update/image* /var/mos/mos-update/kernel/update/drivers*
+  UPDATE_KERNEL="false"
+else
+  echo "Kernel image checksum OK"
+fi
+
+# Verify checksum from drivers
+echo "Verifying md5 checksum from Kernel drivers"
+if [ "$(md5sum /var/mos/mos-update/kernel/update/drivers | awk '{print $1}')" != "$(cat /var/mos/mos-update/kernel/update/drivers.md5)" ] ; then
+  notify -t "MOS Kernel" -m "Kernel drivers checksum error, not updating Kernel" -p "warning"
+  rm -f /var/mos/mos-update/kernel/update/image* /var/mos/mos-update/kernel/update/drivers*
+  UPDATE_KERNEL="false"
+else
+  echo "Kernel drivers checksum OK"
+fi
+
+# Download microcode
+echo "Downloading microcode"
+curl --progress-bar -L \
+  --header "Authorization: Bearer $TOKEN" \
+  --header "Accept: application/octet-stream" \
+  --header "X-GitHub-Api-Version: 2022-11-28" \
+  --output "/var/mos/mos-update/kernel/update/microcode" \
+  "https://api.github.com/repos/ich777/mos-kernel/releases/assets/$ASSET_MICROCODE"
+  
+# Download microcode.md5
+echo "Downloading microcode.md5"
+curl -s -L \
+  --header "Authorization: Bearer $TOKEN" \
+  --header "Accept: application/octet-stream" \
+  --header "X-GitHub-Api-Version: 2022-11-28" \
+  --output "/var/mos/mos-update/kernel/update/microcode.md5" \
+  "https://api.github.com/repos/ich777/mos-kernel/releases/assets/$ASSET_MICROCODE_MD5"
+  
+# Verify checksum
+echo "Verifying md5 checksum from microcode"
+if [ "$(md5sum /var/mos/mos-update/kernel/update/microcode | awk '{print $1}')" != "$(cat /var/mos/mos-update/kernel/update/microcode.md5)" ] ; then
+  notify -t "MOS Kernel" -m "microcode checksum error, not updating microcode" -p "alert"
+  rm -rf /var/mos/mos-update/kernel/update/microcode*
+  UPDATE_MICROCODE="false"
+else
+  echo "microcode checksum OK"
+fi
+
+# Check if rollback version is the same as installed version
+if [ "$CURRENT_VERSION" != "$VERSION" ] ; then
+  echo "Moving current Kernel version to /boot/rollback/kernel"
+  if [ ! -d /boot/rollback/kernel ] ; then
+    mkdir -p /boot/rollback/kernel >/dev/null 2>&1
+  else
+    rm -rf /boot/rollback/kernel/*
+  fi
+  echo "{ \"kernel_version\": \"$CURRENT_VERSION\" }" > /boot/rollback/kernel/version.json
+
+  echo "Moving current Kernel files into rollback directory"
+  if [ "$UPDATE_KERNEL" != "false" ] ; then
+    mv /boot/image* /boot/drivers* /boot/rollback/kernel
+  fi
+  if [ "$UPDATE_MICROCODE" != "false" ] ; then
+    mv /boot/microcode* /boot/rollback/kernel
+  fi
+else
+  echo "Rollback Kernel version already in palce"
+fi
+
+echo "Moving Kernel files into place, please wait"
+if [ "$UPDATE_KERNEL" != "false" ] ; then
+  mv /var/mos/mos-update/kernel/update/image* /var/mos/mos-update/kernel/update/drivers* /boot/
+fi
+if [ "$UPDATE_MICROCODE" != "false" ] ; then
+  mv /var/mos/mos-update/kernel/update/microcode* /boot/
+fi
+
+notify -t "MOS Kernel" -m "MOS Kernel update done, please reboot" -p "normal"
