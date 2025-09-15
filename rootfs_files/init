@@ -7,6 +7,9 @@
 # Make Kernel less noisy in terminal
 /bin/echo 4 > /proc/sys/kernel/printk
 
+# Remove microcode update directories
+/bin/rm -rf /kernel
+
 # Get boot label if set or set to default
 BOOT_LABEL=$(/bin/cat /proc/cmdline | /bin/grep "BOOT_LABEL" | /bin/grep -o 'BOOT_LABEL=[^"]*' | /usr/bin/cut -d '=' -f2)
 if [ -z "$BOOT_LABEL" ] ; then
