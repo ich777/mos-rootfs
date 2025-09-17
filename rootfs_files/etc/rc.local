@@ -16,3 +16,6 @@ fi
 # Set keyboard layout
 KEYMAP=$(jq -r '.keymap' /boot/config/system.json)
 loadkeys $KEYMAP
+
+# Set ulimit
+ulimit -n 65536
