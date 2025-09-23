@@ -1,0 +1,42 @@
+#!/bin/sh -e
+# MOS custom
+
+### BEGIN INIT INFO
+# Provides:          docker-watchdog
+# Required-Start:    docker
+# Required-Stop:     docker
+# Default-Start:     S
+# Default-Stop:      0 6
+# Short-Description: Run docker-watchdog
+# Description:       Run docker-watchdog
+### END INIT INFO
+
+PATH="/sbin:/bin:/usr/sbin:/usr/bin"
+DESC="MOS Docker Watchdog"
+NAME="docker-watchdog"
+DAEMON="/usr/bin/docker-watchdog"
+PID="/run/docker-watchdog.pid"
+USER="root"
+RUN_DIR="/run"
+
+. /lib/lsb/init-functions
+
+start_watchdog() {
+    start-stop-daemon --start --background --make-pidfile --pidfile $PID --user $USER --exec "$DAEMON" -- $ARGS >/dev/null 2>&1
+}
+
+stop_watchdog() {
+    start-stop-daemon --stop --pidfile "$PID"
+}
+
+case "$1" in
+	start)
+		start_watchdog
+		log_end_msg 0
+		;;
+  stop)
+		stop_watchdog
+		log_end_msg 0
+    exit 0
+    ;;
+esac
