@@ -34,10 +34,10 @@ mergerfs_mount_disk() {
     if [ "$5" == "true" ] ; then
       if [ ! -z "$6" ] ; then
         echo "$6" | cryptsetup open /dev/disk/by-uuid/$2 ${3}_${4}
-      elif [ -f /tmp/luks/$2.key ] ; then
-        cryptsetup open /dev/disk/by-uuid/$2 ${3}_${4} --key-file /tmp/luks/$2.key
-      elif [ -f /boot/config/system/luks/$2.key ] ; then
-        cryptsetup open /dev/disk/by-uuid/$2 ${3}_${4} --key-file /boot/config/system/luks/$2.key
+      elif [ -f /tmp/luks/$3.key ] ; then
+        cryptsetup open /dev/disk/by-uuid/$2 ${3}_${4} --key-file /tmp/luks/$3.key
+      elif [ -f /boot/config/system/luks/$3.key ] ; then
+        cryptsetup open /dev/disk/by-uuid/$2 ${3}_${4} --key-file /boot/config/system/luks/$3.key
       else
         logger "Can't mount encrypted disk$4 from pool: $3 without passphrase or keyfile"
         return 1
@@ -70,10 +70,10 @@ snapraid_mount_disk() {
     if [ "$5" == "true" ] ; then
       if [ ! -z "$6" ] ; then
         echo "$6" | cryptsetup open /dev/disk/by-uuid/$2 parity_${3}_${4}
-      elif [ -f /tmp/luks/$2.key ] ; then
-        cryptsetup open /dev/disk/by-uuid/$2 parity_${3}_${4} --key-file /tmp/luks/$2.key
-      elif [ -f /boot/config/system/luks/$2.key ] ; then
-        cryptsetup open /dev/disk/by-uuid/$2 parity_${3}_${4} --key-file /boot/config/system/luks/$2.key
+      elif [ -f /tmp/luks/$3.key ] ; then
+        cryptsetup open /dev/disk/by-uuid/$2 parity_${3}_${4} --key-file /tmp/luks/$3.key
+      elif [ -f /boot/config/system/luks/$3.key ] ; then
+        cryptsetup open /dev/disk/by-uuid/$2 parity_${3}_${4} --key-file /boot/config/system/luks/$3.key
       else
         logger "Can't mount encrypted parity$4 from pool: $3 without passphrase or keyfile"
         return 1
@@ -85,8 +85,25 @@ snapraid_mount_disk() {
   fi
 }
 
+btrfs_luks_open() {
+  if [ ! -z "$4" ] ; then
+    echo "$4" | cryptsetup open /dev/disk/by-uuid/$1 ${2}_${3}
+  elif [ -f /tmp/luks/$2.key ] ; then
+    cryptsetup open /dev/disk/by-uuid/$1 ${2}_${3} --key-file /tmp/luks/$2.key
+  elif [ -f /boot/config/system/luks/$2.key ] ; then
+    cryptsetup open /dev/disk/by-uuid/$1 ${2}_${3} --key-file /boot/config/system/luks/$2.key
+  else
+    logger "Can't mount encrypted pool $2 without passphrase or keyfile"
+    return 1
+  fi
+}
+
 btrfs_mount_pool() {
-  mount /dev/disk/by-uuid/$1 /mnt/$2
+  if [ "$3" == "true" ] ; then
+    mount ${1}/${2}_1 /mnt/$2
+  else
+    mount /dev/disk/by-uuid/$1 /mnt/$2
+  fi
 }
 
 ext4_mount_disk() {
@@ -136,7 +153,7 @@ do
   POOL_ENCRYPTED=$(echo $POOL_JSON | jq '.config.encrypted')
   if [ "$POOL_ENCRYPTED" == "true" ] ; then
     ENCRYPTED_TEXT=" encrypted"
-    if [ ! -z "$2 ] ; then 
+    if [ ! -z "$2" ] ; then 
       DECRYPTION_KEY=$(echo "$2" | xargs)
     fi
   fi
@@ -151,6 +168,12 @@ do
       DISK_FS=$(echo "$DISK_DETAILS" | jq -r '.filesystem')
       logger "Mounting$ENCRYPTED_TEXT mergerfs disk${DISK_ID} from: $POOL"
       mergerfs_mount_disk "$DISK_FS" "$DISK_ID" "$POOL" "$data_slot" "$POOL_ENCRYPTED" "$DECRYPTION_KEY"
+      EXIT_STATUS=$?
+      if [ "$EXIT_STATUS" != "0" ] ; then
+        umount /mnt/$POOL >/dev/null 2>&1
+        rmdir /mnt/$POOL
+        continue 2
+      fi
       if [ -z "$MOUNTS" ] ; then
         MOUNTS="/var/mergerfs/$POOL/disk$data_slot"
       else
@@ -185,19 +208,47 @@ do
     fi
   elif [ "$POOL_TYPE" == "btrfs" ] ; then
     create_pool_directory "$POOL" "$POOL_TYPE" || { echo "Pool $POOL already mounted" ; continue ; }
-    logger "Mounting btrfs pool: $POOL"
+    logger "Mounting$ENCRYPTED_TEXT btrfs pool: $POOL"
     DISK_ID=$(echo "$POOL_JSON" | jq -r --arg disk_no "$DISK_NO" '.data_devices[0].id')
-    btrfs_mount_pool "$DISK_ID" "$POOL"
+    if [ "$POOL_ENCRYPTED" == "true" ] ; then
+      for data_slot in $(echo $POOL_JSON | jq -r '.data_devices[].slot')
+      do
+        DISK_DETAILS=$(echo "$POOL_JSON" | jq -r --arg data_slot "$data_slot" '.data_devices[] | select(.slot == $data_slot)')
+        DISK_ID_BTRFS=$(echo "$DISK_DETAILS" | jq -r '.id')
+        btrfs_luks_open "$DISK_ID_BTRFS" "$POOL" "$data_slot" "$DECRYPTION_KEY"
+      done
+      btrfs_mount_pool "/dev/mapper/" "$POOL" "true"
+      EXIT_STATUS=$?
+      if [ "$EXIT_STATUS" == "1" ] ; then
+        umount /mnt/$POOL >/dev/null 2>&1
+        rmdir /mnt/$POOL
+        continue 2
+      fi
+    else
+      btrfs_mount_pool "$DISK_ID" "$POOL" "false"
+    fi
   elif [ "$POOL_TYPE" == "ext4" ] ; then
     create_pool_directory "$POOL" "$POOL_TYPE" || { echo "Pool $POOL already mounted" ; continue ; }
     logger "Mounting$ENCRYPTED_TEXT ext4 disk: $POOL"
     DISK_ID=$(echo "$POOL_JSON" | jq -r --arg disk_no "$DISK_NO" '.data_devices[0].id')
     ext4_mount_disk "$DISK_ID" "$POOL" "$POOL_ENCRYPTED" "$DECRYPTION_KEY"
+    EXIT_STATUS=$?
+    if [ "$EXIT_STATUS" != "0" ] ; then
+      umount /mnt/$POOL >/dev/null 2>&1
+      rmdir /mnt/$POOL
+      continue 2
+    fi
   elif [ "$POOL_TYPE" == "xfs" ] ; then
     create_pool_directory "$POOL" "$POOL_TYPE" || { echo "Pool $POOL already mounted" ; continue ; }
     logger "Mounting$ENCRYPTED_TEXT xfs disk: $POOL"
     DISK_ID=$(echo "$POOL_JSON" | jq -r --arg disk_no "$DISK_NO" '.data_devices[0].id')
     xfs_mount_disk "$DISK_ID" "$POOL" "$POOL_ENCRYPTED" "$DECRYPTION_KEY"
+    EXIT_STATUS=$?
+    if [ "$EXIT_STATUS" != "0" ] ; then
+      umount /mnt/$POOL >/dev/null 2>&1
+      rmdir /mnt/$POOL
+      continue 2
+    fi
   fi
-  unset POOL_JSON DISK_COUNT DISK_NO MOUNTS PARITY_COUNT POOL_ENCRYPTED ENCRYPTED_TEXT KEY
+  unset POOL_JSON DISK_COUNT DISK_NO MOUNTS PARITY_COUNT POOL_ENCRYPTED ENCRYPTED_TEXT KEY EXIT_STATUS
 done
