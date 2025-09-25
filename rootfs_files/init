@@ -10,6 +10,14 @@
 # Remove microcode update directories
 /bin/rm -rf /kernel
 
+# Display MOS Banner and MOS version
+/bin/echo "░  ░░░░  ░░░      ░░░░      ░░"
+/bin/echo "▒   ▒▒   ▒▒  ▒▒▒▒  ▒▒  ▒▒▒▒▒▒▒"
+/bin/echo "▓        ▓▓  ▓▓▓▓  ▓▓▓      ▓▓"
+/bin/echo "█  █  █  ██  ████  ████████  █"
+/bin/echo "█  ████  ███      ████      ██"
+/bin/echo "$(/usr/bin/jq -r '"\(.mos.version)-\(.mos.channel)"' /etc/mos-release.json)"
+
 # Get boot label if set or set to default
 BOOT_LABEL=$(/bin/cat /proc/cmdline | /bin/grep "BOOT_LABEL" | /bin/grep -o 'BOOT_LABEL=[^"]*' | /usr/bin/cut -d '=' -f2)
 if [ -z "$BOOT_LABEL" ] ; then
