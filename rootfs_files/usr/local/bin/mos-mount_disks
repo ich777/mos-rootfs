@@ -33,7 +33,7 @@ mergerfs_mount_disk() {
   if [ ! "$(findmnt /var/mergerfs/$3/disk$4)" ]; then
     if [ "$5" == "true" ] ; then
       if [ ! -z "$6" ] ; then
-        echo "$6" | cryptsetup open /dev/disk/by-uuid/$2 ${3}_${4}
+        echo "${6//\"/\\\"}" | cryptsetup open /dev/disk/by-uuid/$2 ${3}_${4}
       elif [ -f /tmp/luks/$3.key ] ; then
         cryptsetup open /dev/disk/by-uuid/$2 ${3}_${4} --key-file /tmp/luks/$3.key
       elif [ -f /boot/config/system/luks/$3.key ] ; then
@@ -69,7 +69,7 @@ snapraid_mount_disk() {
   if [ ! "$(findmnt /var/snapraid/$3/parity$4)" ]; then
     if [ "$5" == "true" ] ; then
       if [ ! -z "$6" ] ; then
-        echo "$6" | cryptsetup open /dev/disk/by-uuid/$2 parity_${3}_${4}
+        echo "${6//\"/\\\"}" | cryptsetup open /dev/disk/by-uuid/$2 parity_${3}_${4}
       elif [ -f /tmp/luks/$3.key ] ; then
         cryptsetup open /dev/disk/by-uuid/$2 parity_${3}_${4} --key-file /tmp/luks/$3.key
       elif [ -f /boot/config/system/luks/$3.key ] ; then
@@ -87,7 +87,7 @@ snapraid_mount_disk() {
 
 btrfs_luks_open() {
   if [ ! -z "$4" ] ; then
-    echo "$4" | cryptsetup open /dev/disk/by-uuid/$1 ${2}_${3}
+    echo "${4//\"/\\\"}" | cryptsetup open /dev/disk/by-uuid/$1 ${2}_${3}
   elif [ -f /tmp/luks/$2.key ] ; then
     cryptsetup open /dev/disk/by-uuid/$1 ${2}_${3} --key-file /tmp/luks/$2.key
   elif [ -f /boot/config/system/luks/$2.key ] ; then
@@ -109,7 +109,7 @@ btrfs_mount_pool() {
 ext4_mount_disk() {
   if [ "$3" == "true" ] ; then
     if [ ! -z "$4" ] ; then
-      echo "$4" | cryptsetup open /dev/disk/by-uuid/$1 ${2}_1
+      echo "${4//\"/\\\"}" | cryptsetup open /dev/disk/by-uuid/$1 ${2}_1
     elif [ -f /tmp/luks/$2.key ] ; then
       cryptsetup open /dev/disk/by-uuid/$1 ${2}_1 --key-file /tmp/luks/$2.key
     elif [ -f /boot/config/system/luks/$2.key ] ; then
@@ -127,7 +127,7 @@ ext4_mount_disk() {
 xfs_mount_disk() {
   if [ "$3" == "true" ] ; then
     if [ ! -z "$4" ] ; then
-      echo "$4" | cryptsetup open /dev/disk/by-uuid/$1 ${2}_1
+      echo "${4//\"/\\\"}" | cryptsetup open /dev/disk/by-uuid/$1 ${2}_1
     elif [ -f /tmp/luks/$2.key ] ; then
       cryptsetup open /dev/disk/by-uuid/$1 ${2}_1 --key-file /tmp/luks/$2.key
     elif [ -f /boot/config/system/luks/$2.key ] ; then
@@ -252,3 +252,8 @@ do
   fi
   unset POOL_JSON DISK_COUNT DISK_NO MOUNTS PARITY_COUNT POOL_ENCRYPTED ENCRYPTED_TEXT KEY EXIT_STATUS
 done
+
+# Make sure to remove temporary LUKS files
+if [ -d /tmp/luks ] ; thn
+  rm -rf /tmp/luks
+fi
