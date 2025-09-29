@@ -125,16 +125,19 @@ if [ "$(md5sum /var/mos/mos-update/kernel/update/image | awk '{print $1}')" != "
   UPDATE_KERNEL="false"
 else
   echo "Kernel image checksum OK"
+  UPDATE_KERNEL="true"
 fi
 
-# Verify checksum from drivers
-echo "Verifying md5 checksum from Kernel drivers"
-if [ "$(md5sum /var/mos/mos-update/kernel/update/drivers | awk '{print $1}')" != "$(cat /var/mos/mos-update/kernel/update/drivers.md5)" ] ; then
-  notify -t "MOS Kernel" -m "Kernel drivers checksum error, not updating Kernel" -p "warning"
-  rm -f /var/mos/mos-update/kernel/update/image* /var/mos/mos-update/kernel/update/drivers*
-  UPDATE_KERNEL="false"
-else
-  echo "Kernel drivers checksum OK"
+# Verify checksum from drivers if image checksum was okay
+if [ "$UPDATE_KERNEL" = "true" ] ; then
+  echo "Verifying md5 checksum from Kernel drivers"
+  if [ "$(md5sum /var/mos/mos-update/kernel/update/drivers | awk '{print $1}')" != "$(cat /var/mos/mos-update/kernel/update/drivers.md5)" ] ; then
+    notify -t "MOS Kernel" -m "Kernel drivers checksum error, not updating Kernel" -p "warning"
+    rm -f /var/mos/mos-update/kernel/update/image* /var/mos/mos-update/kernel/update/drivers*
+    UPDATE_KERNEL="false"
+  else
+    echo "Kernel drivers checksum OK"
+  fi
 fi
 
 # Download microcode
