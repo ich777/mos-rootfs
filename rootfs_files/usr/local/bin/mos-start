@@ -94,7 +94,7 @@ docker_network_create() {
 
 docker_network_check() {
   DOCKER_NET_MODE=$(echo $DOCKER_JSON | jq -r '.docker_net.mode')
-  INTERFACE_MODE=$(echo $NETWORK_JSON | jq -r '.interfaces.eth0.type')
+  INTERFACE_MODE=$(echo $NETWORK_JSON | jq -r '.interfaces[] | select(.name == "eth0") | .type')
   if [ "$INTERFACE_MODE" = "bridged" ] ; then
     INTERFACE=br0
   else
