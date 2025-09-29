@@ -131,8 +131,8 @@ if [ "$3" = "update_kernel" ] ; then
       # Get assed ID's for image/drivers and md5's
       ASSET_KERNEL=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "image") | .id' /var/mos/mos-update/$KERNEL.json)
       ASSET_DRIVERS=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "drivers") | .id' /var/mos/mos-update/$KERNEL.json)
-      ASSET_KERNEL_MD5=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "image") | .id' /var/mos/mos-update/$KERNEL.json)
-      ASSET_DRIVERS_MD5=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "drivers") | .id' /var/mos/mos-update/$KERNEL.json)
+      ASSET_KERNEL_MD5=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "image.md5") | .id' /var/mos/mos-update/$KERNEL.json)
+      ASSET_DRIVERS_MD5=$(jq --arg kernel $KERNEL -r '.[] | select(.tag_name == $kernel) | .assets[] | select(.name == "drivers.md5") | .id' /var/mos/mos-update/$KERNEL.json)
       UPDATE_KERNEL="true"
     else
       notify -t "MOS Update" -m "No Kernel update needed, continuing with upgrade" -p "normal"
