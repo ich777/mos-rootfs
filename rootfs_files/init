@@ -119,6 +119,9 @@ for json in "${JSON_FILES[@]}"; do
   [ -f /boot/config/$json ] && /bin/cat /boot/config/$json > /dev/null
 done
 
+# Set ulimit before handing over to /sbin/init
+ulimit -n 65536
+
 # Move system init to /lib/init/system-init
 /bin/mv /init /lib/init/system-init
 
