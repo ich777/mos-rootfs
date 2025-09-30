@@ -63,7 +63,7 @@ for remote_name in $REMOTES; do
 
     # Check if share path is already mounted
     if findmnt /mnt/remotes/${server}/${share} >/dev/null 2>&1 ; then
-      echo "Already found mounted share at: /mnt/remotes/${server}/${share}, skipping"
+      logger "Already found mounted share at: /mnt/remotes/${server}/${share}, skipping"
       continue
     fi
 
@@ -90,11 +90,11 @@ for remote_name in $REMOTES; do
       [ "$gid" != "null" ] && \
         SMB_OPTIONS="$SMB_OPTIONS,gid=${gid}"
 
-      echo "Mounting SAMBA remote share: $share from host: $server"
+      logger "Mounting SAMBA remote share: $share from host: $server"
       mount -t cifs //${server}/${share} /mnt/remotes/${server}/${share} -o ${SMB_OPTIONS}
       EXIT_STATUS=$?
       if [ "$EXIT_STATUS" != "0" ] ; then
-        echo "ERROR: Mount from SAMBA share: $share from server: $server not successful"
+        logger "Error mounting SAMBA share: $share from server: $server"
         rmdir /mnt/remotes/${server}/${share}
       fi
     elif [ "$type" = "nfs" ] ; then
@@ -106,11 +106,11 @@ for remote_name in $REMOTES; do
       [ "$gid" != "null" ] && \
         NFS_OPTIONS="$NFS_OPTIONS,gid=${gid}"
 
-      echo "Mounting NFS remote share: $share from host: $server"
+      logger "Mounting NFS remote share: $share from host: $server"
       mount -t nfs ${server}:/${share} /mnt/remotes/${server}/${share} -o ${NFS_OPTIONS}
       EXIT_STATUS=$?
       if [ "$EXIT_STATUS" != "0" ] ; then
-        echo "ERROR: Mount from NFS share: $share from server: $server not successful"
+        logger "Error mounting NFS share: $share from server: $server"
         rmdir /mnt/remotes/${server}/${share}
       fi
     fi
