@@ -217,6 +217,15 @@ start_iscsi_target() {
   fi
 }
 
+
+# Mount Remotes
+mount_remotes() {
+  REMOTE_MOUNTS_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.remote_mounting.enabled')
+  if [ "$REMOTE_MOUNTS_ENABLED" = "true" ] ; then
+    /usr/local/bin/mos-mount_remotes
+  fi
+}
+
 # iSCSI Initiator
 start_iscsi_initiator() {
   ISCSI_INITIATOR_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.iscsi_initiator.enabled')
@@ -258,6 +267,7 @@ if [ "$1" = "os" ] ; then
   start_iscsi_initiator
   mount_disks
   start_iscsi_target
+  mount_remotes
   optional_packages
   start_nut
   start_nmbd
