@@ -75,7 +75,7 @@ for remote_name in $REMOTES; do
     if [ "$type" = "smb" ] ; then
       if [ "$username" != "null" ] ; then
         DECRYPTED_PASSWORD=$(decrypt_password "${password}")
-        SMB_OPTIONS="username=${username},password=${DECRYPTED_PASSWORD},vers=${version}"
+        SMB_OPTIONS="username=${username},password=${DECRYPTED_PASSWORD},vers=${version},iocharset=utf8,noperm"
         unset DECRYPTED_PASSWORD
       else
         SMB_OPTIONS="guest,vers=${version}"
