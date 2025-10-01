@@ -128,6 +128,8 @@ for key in $(/usr/bin/jq -r 'keys[]' /boot/config/system/proxy.json 2>/dev/null)
   KEY_UPPER=$(/bin/echo "$key" | /usr/bin/tr '[:lower:]' '[:upper:]')
   export "$key=$value"
   export "$KEY_UPPER=$value"
+  /bin/echo "$key=$value" >> /etc/environment
+  /bin/echo "$KEY_UPPER=$value" >> /etc/environment
 done
 
 # Move system init to /lib/init/system-init
