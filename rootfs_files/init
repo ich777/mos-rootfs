@@ -125,11 +125,13 @@ ulimit -n 65536
 # Set proxy as early as possible
 for key in $(/usr/bin/jq -r 'keys[]' /boot/config/system/proxy.json 2>/dev/null) ; do
   value=$(/usr/bin/jq -r ".$key" /boot/config/system/proxy.json)
-  KEY_UPPER=$(/bin/echo "$key" | /usr/bin/tr '[:lower:]' '[:upper:]')
-  export "$key=$value"
-  export "$KEY_UPPER=$value"
-  /bin/echo "$key=$value" >> /etc/environment
-  /bin/echo "$KEY_UPPER=$value" >> /etc/environment
+  if [ ! -z "$value" ] && [ "$value" != "null" ] ; then
+    KEY_UPPER=$(/bin/echo "$key" | /usr/bin/tr '[:lower:]' '[:upper:]')
+    export "$key=$value"
+    export "$KEY_UPPER=$value"
+    /bin/echo "$key=$value" >> /etc/environment
+    /bin/echo "$KEY_UPPER=$value" >> /etc/environment
+  fi
 done
 
 # Move system init to /lib/init/system-init
