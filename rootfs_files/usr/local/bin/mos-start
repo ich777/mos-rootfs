@@ -139,10 +139,11 @@ start_docker() {
   DOCKER_ENABLED=$(echo $DOCKER_JSON | jq -r '.enabled')
   if [ "$DOCKER_ENABLED" = "true" ] ; then
     DOCKER_APPDATA=$(echo $DOCKER_JSON | jq -r '.appdata')
+    DOCKER_OPTIONS=$(echo $DOCKER_JSON | jq -r '.docker_options // ""')
     if [ ! -d $DOCKER_APPDATA ] ; then
       mkdir -p $DOCKER_APPDATA
     fi
-    /etc/init.d/docker start
+    DOCKER_OPTS="$DOCKER_OPTIONS" /etc/init.d/docker start
   fi
 }
 
