@@ -28,6 +28,10 @@ start_notify() {
   /etc/init.d/notify start
 }
 
+start_cron() {
+  /etc/init.d/cron start
+}
+
 start_ssh() {
   SSH_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.ssh.enabled')
   if [ "$SSH_ENABLED" = "true" ] ; then
@@ -280,6 +284,7 @@ if [ "$1" = "os" ] ; then
   start_vm
   start_tailscale
   start_netbird
+  start_cron
   start_nginx
   start_api
   mos_spindown
