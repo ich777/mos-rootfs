@@ -5,6 +5,16 @@ crontab=""
 POOLS_JSON=$(jq -r '.' /boot/config/pools.json 2>/dev/null)
 POOLS_MERGERFS=$(echo $POOLS_JSON | jq -r '.[] | select(.type == "mergerfs") | .id')
 
+convert_schedule() {
+  echo "$1" | sed -e 's/\b[Ss][Uu][Nn]\b/0/g' \
+    -e 's/\b[Mm][Oo][Nn]\b/1/g' \
+    -e 's/\b[Tt][Uu][Ee]\b/2/g' \
+    -e 's/\b[Ww][Ee][Dd]\b/3/g' \
+    -e 's/\b[Tt][Hh][Uu]\b/4/g' \
+    -e 's/\b[Ff][Rr][Ii]\b/5/g' \
+    -e 's/\b[Ss][Aa][Tt]\b/6/g'
+}
+
 pools_cron=""
 if [ "$POOLS_MERGERFS" != "" ] && [ "$POOLS_MERGERFS" != "null" ]; then
   IFS=$'\n'
@@ -13,6 +23,7 @@ if [ "$POOLS_MERGERFS" != "" ] && [ "$POOLS_MERGERFS" != "null" ]; then
     if [ "$SYNC_ENABLED" != "" ] && [ "$SYNC_ENABLED" != "null" ] && [ "$SYNC_ENABLED" == "true" ]; then
       POOL_NAME=$(echo "$POOLS_JSON" | jq -r ".[] | select(.id == \"$pool\") | .name")
       SYNC_SCHEDULE=$(echo "$POOLS_JSON" | jq -r ".[] | select(.id == \"$pool\") | .config.sync.schedule")
+      SYNC_SCHEDULE=$(convert_schedule "$SYNC_SCHEDULE")
       pools_cron="# MOS $POOL_NAME Parity Sync:"'\n'"$SYNC_SCHEDULE /usr/local/bin/mos-snapraid $POOL_NAME sync > /dev/null 2>&1"'\n'
       CHECK_ENABLED=$(echo "$POOLS_JSON" | jq -r ".[] | select(.id == \"$pool\") | .config.sync.check.enabled")
       if [ "$CHECK_ENABLED" != "" ] && [ "$CHECK_ENABLED" != "null" ] && [ "$CHECK_ENABLED" == "true" ]; then
@@ -35,6 +46,7 @@ if [ "$DOCKER_UPDATE" != "" ] && [ "$DOCKER_UPDATE" != "null" ] && [ "$DOCKER_UP
   DOCKER_AUTO_UPDATE=$(echo "$DOCKER_JSON" | jq -r '.update_check.auto_update.enabled')
   if [ "$DOCKER_AUTO_UPDATE" != "null" ] && [ "$DOCKER_AUTO_UPDATE" != "" ] && [ "$DOCKER_AUTO_UPDATE" == "true" ]; then
     DOCKER_AUTO_UPDATE=$(echo "$DOCKER_JSON" | jq -r '.update_check.auto_update.auto_update_schedule')
+    DOCKER_AUTO_UPDATE=$(convert_schedule "$DOCKER_AUTO_UPDATE")
     docker_cron="# MOS Docker Auto Update:"'\n'"$DOCKER_AUTO_UPDATE /usr/local/bin/mos-update_containers > /dev/null 2>&1"'\n'"$docker_cron"
   fi
 fi
@@ -49,6 +61,7 @@ if [ "$CRONJOBS" != "" ] && [ "$CRONJOBS" != "null" ] && [ "$CRONJOBS" != "[]" ]
   for cronjob in $CRONJOBS; do
     NAME=$(echo $CRON_JSON | jq -r ".[] | select(.id == \"$cronjob\") | .name")
     SCHEDULE=$(echo "$CRON_JSON" | jq -r ".[] | select(.id == \"$cronjob\") | .schedule")
+    SCHEDULE=$(convert_schedule "$SCHEDULE")
     COMMAND=$(echo "$CRON_JSON" | jq -r ".[] | select(.id == \"$cronjob\") | .command")
     if [ "$NAME" != "null" ] && [ "$SCHEDULE" != "null" ] && [ "$COMMAND" != "null" ]; then
       cron_jobs="$cron_jobs# $NAME:"'\n'"$SCHEDULE $COMMAND"'\n'
