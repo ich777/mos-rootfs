@@ -1,7 +1,7 @@
 #!/bin/sh
 counter=0
 while ! docker info >/dev/null 2>&1 ; do
-  if [ $counter -ge 15 ]; then
+  if [ $counter -ge 30 ]; then
     logger -t "mos-docker_autostart" "Error: Docker daemon not ready, aborting Container autostart"
     exit 1
   fi
@@ -9,7 +9,7 @@ while ! docker info >/dev/null 2>&1 ; do
   ((counter++))
 done
 
-sleep 5
+sleep 2
 
 AUTOSTART_CONTAINERS=$(jq -r '.[] | select(.autostart == true) | "\(.index):\(.name):\(.wait)"' /var/lib/docker/mos/containers 2>/dev/null | sort -n -t: -k1,1)
 DOCKER_WAIT=$(jq -r '.start_wait' /boot/config/docker.json)
