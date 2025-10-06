@@ -69,9 +69,9 @@ mos_start() {
 
 case "$1" in
 start)	log_daemon_msg "Starting periodic command scheduler" "cron"
+		mos_start
         start_daemon -p $PIDFILE $DAEMON $EXTRA_OPTS
         log_end_msg $?
-        mos_start
 	;;
 stop)	log_daemon_msg "Stopping periodic command scheduler" "cron"
         killproc -p $PIDFILE $DAEMON
