@@ -238,6 +238,15 @@ if [ "$icon" != "null" ] && [ "$icon" != "" ]; then
     else
       cp /var/lib/docker/mos/icons/$name.png /var/www/docker_icons/$name.png 2>/dev/null
     fi
+  else
+    wget -q -O /var/lib/docker/mos/icons/tmp-$name.png "$icon"
+    ES=$?
+    if [ "$ES" != 0 ] ; then
+      rm -f /var/lib/docker/mos/icons/tmp-$name.png
+    else
+      mv /var/lib/docker/mos/icons/tmp-$name.png /var/lib/docker/mos/icons/$name.png 2>/dev/null
+      cp /var/lib/docker/mos/icons/$name.png /var/www/docker_icons/$name.png 2>/dev/null
+    fi
   fi
 fi
 
