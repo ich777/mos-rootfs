@@ -20,7 +20,11 @@ fi
 for container in $CONTAINER_NAMES
 do
   LOCAL_SHA=$(echo $CONTAINERS_JSON | jq -r --arg name "$container" '.[] | select(.name == $name) | .local')
-  REMOTE_SHA=$(echo $CONTAINERS_JSON | jq -r --arg name "$container" '.[] | select(.name == $name) | .remote')
+  if [ "$2" = "force_update" ] ; then
+    REMOTE_SHA="force_update"
+  else
+    REMOTE_SHA=$(echo $CONTAINERS_JSON | jq -r --arg name "$container" '.[] | select(.name == $name) | .remote')
+  fi
   if [ "$LOCAL_SHA" != "$REMOTE_SHA" ] ; then
     if [ ! -f /boot/config/system/docker/templates/$container.json ] ; then
       echo "ERROR: $container.json not found"
