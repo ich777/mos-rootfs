@@ -112,7 +112,12 @@ echo "$CONFIGS" | while IFS= read -r config; do
           host: ((if $host != "" then $host elif $container != "" then ($appdata + $container) else null end) as $final_value |
                 if $final_value != null then
                   (if ($final_value | startswith("/mnt/user") or startswith("/mnt/cache")) then
-                    ($final_value | sub("^/mnt/(user|cache)"; ($appdata | split("/") | .[0:3] | join("/"))))
+                    ($final_value | sub("^/mnt/(user|cache)"; 
+                      (if ($appdata | contains("/mnt/")) then
+                        ($appdata | split("/") | .[0:3] | join("/"))
+                      elif ($appdata | contains("/var/mergerfs/")) then
+                        ($appdata | split("/") | .[0:5] | join("/"))
+                      else $appdata end)))
                   else $final_value end)
                 else null end),
           container: (if $container != "" then $container else null end),
