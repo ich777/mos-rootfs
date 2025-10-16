@@ -292,6 +292,7 @@ echo "Moving files into place, please wait"
 mv /var/mos/mos-update/update/rootfs* /boot/
 if [ "$UPDATE_KERNEL" = "true" ] ; then
   mv /var/mos/mos-update/update/image* /var/mos/mos-update/update/drivers* /boot/
+  /usr/local/bin/mos-driver_download "update" "$KERNEL" "$4"
 fi
 if [ "$UPDATE_MICROCODE" = "true" ] ; then
   mv /var/mos/mos-update/update/microcode* /boot/

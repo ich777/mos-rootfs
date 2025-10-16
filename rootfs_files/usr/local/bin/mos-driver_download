@@ -1,0 +1,163 @@
+#!/bin/sh
+
+if [ -z "$1" ] ; then
+  echo "You have to at least specify the driver name"
+  exit 1
+elif [ "$1" = "upgrade" ] ; then
+  MODE="upgrade"
+elif [ "$1" = "update" ] ; then
+  MODE="update"
+  if [ "$2" = "$(uname -r)" ] ; then
+    echo "Nothing to do for Drivers"
+    exit 0
+  fi
+else
+  MODE="$1"
+fi
+
+if [ -z "$2" ] ; then
+  UNAME="$(uname -r)"
+else
+  UNAME="$2"
+  if [ "$MODE" = "upgrade" ] ; then
+    UNAME="$(uname -r)"
+  fi
+fi
+
+# GH Token
+TOKEN="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"
+
+# Call mos-os_get_releases to get available MOS versions
+if ! /usr/local/bin/mos-drivers_get_releases "$UNAME" ; then
+  exit 1
+fi
+
+# Create necessary directories
+mkdir -p /var/mos/mos-drivers/download/$UNAME >/dev/null 2>&1
+
+# Load drivers into variable
+DRIVERS_JSON="$(cat /var/mos/mos-drivers/drivers-$UNAME.json)"
+
+# Get available driver packages
+AVAILABLE_DRIVERS="$(echo $DRIVERS_JSON | jq -r '.assets[].name | select(endswith(".deb.md5") | not)')"
+
+# Get installed drivers
+INSTALLED_DRIVERS="$(ls -1 /boot/optional/drivers/*/$UNAME/* | cut -d '/' -f7)"
+
+if [ -z "$INSTALLED_DRIVERS" ] ; then
+  echo "No installed addon drivers found"
+  exit 0
+fi
+
+# Download function with md5 check
+download_asset() {
+  echo "Downloading: $3"
+  curl --progress-bar -L \
+    --header "Authorization: Bearer $TOKEN" \
+    --header "Accept: application/octet-stream" \
+    --header "X-GitHub-Api-Version: 2022-11-28" \
+    --output "/boot/optional/drivers/$1/$UNAME" \
+    "https://api.github.com/repos/ich777/mos-addon-drivers/releases/assets/$2"
+
+  if [ "$4" = ".md5" ] ; then
+    if "$(md5sum /boot/optional/drivers/$1/$UNAME/$3 | awk '{print $1}')" != "$(cat /boot/optional/drivers/$1/$UNAME/$3.md5 | awk '{print $1}')"
+      echo "$3 checksom ERROR"
+      return 1
+    else
+      echo "$3 checksum OK"
+    fi
+  fi
+}
+
+if [ "$MODE" = "upgrade" ] ; then
+  REBOOT=false
+  for driver in $INSTALLED_DRIVERS
+  do
+    NAME=$(echo $driver | cut -d '-' -f1)
+    TYPE=$(echo $driver | cut -d '-' -f2- | cut -d '_' -f1)
+    VERSION=$(echo $driver | cut -d '_' -f2- | cut -d '+' -f1)
+    mkdir -p /boot/optional/drivers/$NAME/$UNAME 2>/dev/null
+    DRV="$(echo "$AVAILABLE_DRIVERS" | grep "^${NAME}-${TYPE}" | sort -V | tail -1)"
+    if [ -z "$DRV" ] ; then
+      echo "Something went wrong for driver: $driver"
+      continue
+    fi
+    AVAIL_DRV_V=$(echo $DRV | cut -d '_' -f2- | cut -d '+' -f1)
+    if [ "$AVAIL_DRV_V" != "$VERSION" ] ; then
+      DRV_ASSET=$(echo "$DRIVERS_JSON" | jq --arg driver $DRV -r '.assets[] | select(.name == $driver) | .id')
+      DRV_ASSET_MD5=$(echo "$DRIVERS_JSON" | jq --arg driver $DRV.md5 -r '.assets[] | select(.name == $driver) | .id')
+      download_asset "$NAME" "$DRV_ASSET" "$DRV"
+      download_asset "$NAME" "$DRV_ASSET" "$DRV" ".md5"
+      EXIT_STATUS=$?
+      if [ "$EXIT_STATUS" != "0" ] ; then
+        rm -rf /boot/optional/drivers/$NAME/$UNAME
+        continue
+      fi
+      echo "Download from driver: $driver successful"
+      REBOOT=true
+    else
+      echo "Nothing to do for driver: $driver"
+    fi
+  done
+  if [ "$REBOOT" = "true" ] ; then
+    echo "Please reboot to complete the driver update"
+  fi
+elif [ "$MODE" = "update" ] ; then
+  REBOOT=false
+  for driver in $INSTALLED_DRIVERS
+  do
+    NAME=$(echo $driver | cut -d '-' -f1)
+    TYPE=$(echo $driver | cut -d '-' -f2- | cut -d '_' -f1)
+    VERSION=$(echo $driver | cut -d '_' -f2- | cut -d '+' -f1)
+    mkdir -p /boot/optional/drivers/$NAME/$UNAME >2/dev/null
+    if echo "$AVAILABLE_DRIVERS" | grep -q "^${NAME}-${TYPE}_${VERSION}" ; then
+      DRV="$(echo "$AVAILABLE_DRIVERS" | grep "^${NAME}-${TYPE}_${VERSION}")"
+    else
+      DRV="$(echo "$AVAILABLE_DRIVERS" | grep "^${NAME}-${TYPE}" | sort -V | tail -1)"
+    fi
+    if [ -z "$DRV" ] ; then
+      echo "Something went wrong for driver: $driver"
+      continue
+    fi
+    DRV_ASSET=$(echo "$DRIVERS_JSON" | jq --arg driver $DRV -r '.assets[] | select(.name == $driver) | .id')
+    DRV_ASSET_MD5=$(echo "$DRIVERS_JSON" | jq --arg driver $DRV.md5 -r '.assets[] | select(.name == $driver) | .id')
+    download_asset "$NAME" "$DRV_ASSET" "$DRV"
+    download_asset "$NAME" "$DRV_ASSET" "$DRV" ".md5"
+    EXIT_STATUS=$?
+    if [ "$EXIT_STATUS" != "0" ] ; then
+      rm -rf /boot/optional/drivers/$NAME/$UNAME
+      continue
+    fi
+    echo "Download from driver: $driver successful"
+  done
+else
+  NAME=$(echo $1 | cut -d '-' -f1)
+  mkdir -p /boot/optional/drivers/$NAME/$UNAME >2/dev/null
+  DRV="$(echo "$AVAILABLE_DRIVERS" | grep "^${1}")"
+  if [ -z "$DRV" ] ; then
+    echo "Something went wrong for driver: $1"
+    exit 1
+  fi
+  DRV_ASSET=$(echo "$DRIVERS_JSON" | jq --arg driver $DRV -r '.assets[] | select(.name == $driver) | .id')
+  DRV_ASSET_MD5=$(echo "$DRIVERS_JSON" | jq --arg driver $DRV.md5 -r '.assets[] | select(.name == $driver) | .id')
+  download_asset "$NAME" "$DRV_ASSET" "$1"
+  download_asset "$NAME" "$DRV_ASSET" "$1" ".md5"
+  EXIT_STATUS=$?
+  if [ "$EXIT_STATUS" != "0" ] ; then
+    rm -rf /boot/optional/drivers/$NAME/$UNAME
+    continue
+  fi
+  echo "Download from driver: $1 successful, please reboot"
+fi
+
+if [ "$3" != "no_driver_cleanup" ] ; then
+  for driver_dir in $(ls -1 /boot/optional/drivers/ 2>/dev/null)
+  do
+    for old in $(ls -1 /boot/optional/drivers/$driver_dir | grep -v "$UNAME")
+    do
+      rm -rf "/boot/optional/drivers/$driver_dir/$old"
+    done
+  done
+  find /boot/optional/drivers/ -type d -empty -delete 2>/dev/null
+fi
+exit 0

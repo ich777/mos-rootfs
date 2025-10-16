@@ -192,6 +192,7 @@ fi
 echo "Moving Kernel files into place, please wait"
 if [ "$UPDATE_KERNEL" != "false" ] ; then
   mv /var/mos/mos-update/kernel/update/image* /var/mos/mos-update/kernel/update/drivers* /boot/
+  /usr/local/bin/mos-driver_download "update" "$VERSION" "$2"
 fi
 if [ "$UPDATE_MICROCODE" != "false" ] ; then
   mv /var/mos/mos-update/kernel/update/microcode* /boot/

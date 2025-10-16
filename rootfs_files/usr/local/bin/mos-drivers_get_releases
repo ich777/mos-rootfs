@@ -1,0 +1,42 @@
+#!/bin/sh
+
+if [ ! -z "$1" ] ; then
+  UNAME="$1"
+else
+  UNAME="$(uname -r)"
+fi
+
+mkdir -p /var/mos/mos-drivers >/dev/null 2>&1
+
+# Get releases:
+get_releases() {
+  echo "Trying to get MOS Drivers for Kernel: $UNAME"
+  TOKEN="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"
+  curl -s --request GET \
+    --url "https://api.github.com/repos/ich777/mos-addon-drivers/releases/tags/$UNAME" \
+    --header "Authorization: Bearer $TOKEN" \
+    --header "X-GitHub-Api-Version: 2022-11-28" \
+    -o /var/mos/mos-drivers/drivers-$UNAME.json
+  EXIT_STATUS=$?
+  if [ "$EXIT_STATUS" != "0" ] ; then
+    echo "Something went wrong gathering MOS Drivers for Kernel: $UNAME"
+    exit 1
+  else
+    echo "Download from MOS Drivers for Kernel: $UNAME successful!"
+  fi
+}
+
+if [ ! -f /var/mos/mos-drivers/drivers-$UNAME.json ] ; then
+  get_releases
+else
+  CURENTTIME=$(date +%s)
+  FILETIME=$(stat /var/mos/mos-drivers/drivers-$UNAME.json -c %Y)
+  DIFF=$(expr $CURENTTIME - $FILETIME)
+  CHK_TIMEOUT=300
+  if [ $DIFF -gt $CHK_TIMEOUT ] ; then
+    rm -f /var/mos/mos-drivers/drivers-$UNAME.json
+    get_releases
+  else
+    echo "Driver releases.json for Kernel: $UNAME up to date, try again in a few minutes"
+  fi
+fi
