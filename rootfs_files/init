@@ -88,6 +88,7 @@ if [ ! -z "$DRIVERS" ] ; then
     PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" /usr/bin/dpkg --install $driver >/dev/null
   done
   /sbin/depmod --all
+  /sbin/ldconfig
 fi
 
 # Copy shadow and passwd from boot device if exist
