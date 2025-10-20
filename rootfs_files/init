@@ -20,32 +20,60 @@
 /bin/echo
 
 # Get boot label if set or set to default
-BOOT_LABEL=$(/bin/cat /proc/cmdline | /bin/grep "BOOT_LABEL" | /bin/grep -o 'BOOT_LABEL=[^"]*' | /usr/bin/cut -d '=' -f2)
+BOOT_LABEL="$(/bin/cat /proc/cmdline | /bin/grep "BOOT_LABEL" | /bin/grep -o 'BOOT_LABEL=[^"]*' | /usr/bin/cut -d '=' -f2)"
 if [ -z "$BOOT_LABEL" ] ; then
-  BOOT_LABEL=MOS
+  BOOT_LABEL="MOS"
 fi
 /bin/echo "Setting boot label to: $BOOT_LABEL"
 
 # Get device to boot from
-BOOT_DEVICE=$(/sbin/blkid -L "$BOOT_LABEL")
+BOOT_DEVICE="$(/sbin/blkid -L "$BOOT_LABEL")"
 /bin/echo "Setting boot device to: $BOOT_DEVICE"
+
+if [ -z "$BOOT_DEVICE" ] ; then
+  /bin/echo "ERROR: MOS boot device with label: $BOOT_LABEL not found"
+  sleep infinity
+fi
+
+# Get filesystem type
+BOOT_FS_TYPE=$(/sbin/blkid -s TYPE "$BOOT_DEVICE" | /bin/grep -oP 'TYPE="\K[^"]*')
+
+# Fix permissions if necessary
+fix_boot_permissions() {
+  /usr/bin/chown -R root:root /boot
+  /usr/bin/chmod -R 644 /boot
+}
 
 # Mount boot device
 /bin/echo "Trying to mount $BOOT_DEVICE"
-if [ ! -z "$BOOT_DEVICE" ] ; then
+if [ -z "$BOOT_FS_TYPE" ] ; then
+  /bin/echo "ERROR: Filesystem type from boot device $BOOT_DEVICE empty"
+  /bin/sleep infinity
+elif [ "$BOOT_FS_TYPE" = "vfat" ] ; then
   /bin/mkdir -p /boot
-  /bin/mount -v -t vfat -o rw,flush,noatime,nodiratime,dmask=77,fmask=177,shortname=mixed $BOOT_DEVICE /boot || { /bin/echo "ERROR: Can't mount device: $BOOT_DEVICE"; sleep infinity; }
+  /bin/mount -v -t vfat -o rw,flush,noatime,nodiratime,dmask=77,fmask=177,shortname=mixed $BOOT_DEVICE /boot || { /bin/echo "ERROR: Can't mount device: $BOOT_DEVICE"; /bin/sleep infinity; }
   /bin/echo "$BOOT_DEVICE mounted"
+elif [ "$BOOT_FS_TYPE" = "xfs" ] ; then
+  /bin/mkdir -p /boot
+  /bin/mount -v -t xfs -o auto,rw,noatime,nodiratime,discard $BOOT_DEVICE /boot || { /bin/echo "ERROR: Can't mount device: $BOOT_DEVICE"; /bin/sleep infinity; }
+  /bin/echo "$BOOT_DEVICE mounted"
+  fix_boot_permissions
+elif [ "$BOOT_FS_TYPE" = "btrfs" ] ; then
+  /bin/mkdir -p /boot
+  /bin/mount -v -t btrfs -o auto,rw,noatime,nodiratime,degraded,discard=sync $BOOT_DEVICE /boot || { /bin/echo "ERROR: Can't mount device: $BOOT_DEVICE"; /bin/sleep infinity; }
+  /bin/echo "$BOOT_DEVICE mounted"
+  fix_boot_permissions
 else
-  /bin/echo "ERROR: Can't get boot device"
+  /bin/echo "ERROR: $BOOT_FS_TYPE not supported"
   /bin/sleep infinity
 fi
 
-# DEBUG: Execute script in boot
-if [ -f /boot/script.sh ] ; then
-  /bin/cp /boot/script.sh /tmp/script.sh
-  /bin/chmod +x /tmp/script.sh
+# Execute boot script
+if [ -f /boot/optional/scripts/boot.sh ] ; then
+  /bin/cp /boot/optional/scripts/boot.sh /tmp/boot.sh
+  /bin/chmod +x /tmp/boot.sh
   /tmp/script.sh
+  /bin/rm /tmp/script.sh
 fi
 
 # Create directories
