@@ -27,12 +27,17 @@ fi
 /bin/echo "Setting boot label to: $BOOT_LABEL"
 
 # Get device to boot from
-BOOT_DEVICE="$(/sbin/blkid -L "$BOOT_LABEL")"
-/bin/echo "Setting boot device to: $BOOT_DEVICE"
+for i in $(/usr/bin/seq 1 15); do
+  BOOT_DEVICE="$(/sbin/blkid -L "$BOOT_LABEL")"
+  [ ! -z "$BOOT_DEVICE" ] && break
+  sleep 1
+done
 
 if [ -z "$BOOT_DEVICE" ] ; then
   /bin/echo "ERROR: MOS boot device with label: $BOOT_LABEL not found"
   sleep infinity
+else 
+  /bin/echo "Setting boot device to: $BOOT_DEVICE"
 fi
 
 # Get filesystem type
