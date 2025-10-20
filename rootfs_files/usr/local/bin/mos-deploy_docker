@@ -173,15 +173,6 @@ else
   fi
 fi
 
-if ! eval "$docker_cmd"; then
-  echo "Error creating container: $name"
-  exit 1
-fi
-
-if [ "$UPDATE" = "true" ] ; then
-  docker images ${repo%:*} -f "dangling=true" -q | xargs docker rmi >/dev/null 2>&1
-fi
-
 INDEX=$(jq -r 'keys[] | select(test("^[0-9]+$")) | tonumber' /var/lib/docker/mos/containers 2>/dev/null)
 if [ -z "$INDEX" ] || [ "$INDEX" = "null" ] ; then
   INDEX=0
@@ -258,4 +249,13 @@ if [ "$UPDATE" != "true" ] ; then
   if [ "$(pwd)" != "/boot/config/system/docker/templates" ] ; then
     cp $(pwd)/$1 /boot/config/system/docker/templates/$name.json 2>/dev/null
   fi
+fi
+
+if ! eval "$docker_cmd"; then
+  echo "Error creating container: $name"
+  exit 1
+fi
+
+if [ "$UPDATE" = "true" ] ; then
+  docker images ${repo%:*} -f "dangling=true" -q | xargs docker rmi >/dev/null 2>&1
 fi
