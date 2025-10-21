@@ -26,13 +26,6 @@ if [ -z "$BOOT_LABEL" ] ; then
 fi
 /bin/echo "Setting boot label to: $BOOT_LABEL"
 
-
-#DEBUG
-/bin/sleep 15
-/sbin/blkid
-/bin/sleep 30
-
-
 # Get device to boot from
 for i in $(/usr/bin/seq 1 15); do
   BOOT_DEVICE="$(/sbin/blkid -L "$BOOT_LABEL")"
@@ -52,26 +45,24 @@ BOOT_FS_TYPE=$(/sbin/blkid -s TYPE "$BOOT_DEVICE" | /bin/grep -oP 'TYPE="\K[^"]*
 
 # Fix permissions if necessary
 fix_boot_permissions() {
-  /usr/bin/chown -R root:root /boot
-  /usr/bin/chmod -R 644 /boot
+  /bin/chown -R root:root /boot 2>/dev/null
+  /bin/chmod -R 644 /boot 2>/dev/null
 }
 
 # Mount boot device
+/bin/mkdir -p /boot 2>/dev/null
 /bin/echo "Trying to mount $BOOT_DEVICE"
 if [ -z "$BOOT_FS_TYPE" ] ; then
   /bin/echo "ERROR: Filesystem type from boot device $BOOT_DEVICE empty"
   /bin/sleep infinity
 elif [ "$BOOT_FS_TYPE" = "vfat" ] ; then
-  /bin/mkdir -p /boot
   /bin/mount -v -t vfat -o rw,flush,noatime,nodiratime,dmask=77,fmask=177,shortname=mixed $BOOT_DEVICE /boot || { /bin/echo "ERROR: Can't mount device: $BOOT_DEVICE"; /bin/sleep infinity; }
   /bin/echo "$BOOT_DEVICE mounted"
 elif [ "$BOOT_FS_TYPE" = "xfs" ] ; then
-  /bin/mkdir -p /boot
   /bin/mount -v -t xfs -o auto,rw,noatime,nodiratime,discard $BOOT_DEVICE /boot || { /bin/echo "ERROR: Can't mount device: $BOOT_DEVICE"; /bin/sleep infinity; }
   /bin/echo "$BOOT_DEVICE mounted"
   fix_boot_permissions
 elif [ "$BOOT_FS_TYPE" = "btrfs" ] ; then
-  /bin/mkdir -p /boot
   /bin/mount -v -t btrfs -o auto,rw,noatime,nodiratime,degraded,discard=sync $BOOT_DEVICE /boot || { /bin/echo "ERROR: Can't mount device: $BOOT_DEVICE"; /bin/sleep infinity; }
   /bin/echo "$BOOT_DEVICE mounted"
   fix_boot_permissions
