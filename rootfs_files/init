@@ -26,16 +26,23 @@ if [ -z "$BOOT_LABEL" ] ; then
 fi
 /bin/echo "Setting boot label to: $BOOT_LABEL"
 
+
+#DEBUG
+/bin/sleep 15
+/sbin/blkid
+/bin/sleep 30
+
+
 # Get device to boot from
 for i in $(/usr/bin/seq 1 15); do
   BOOT_DEVICE="$(/sbin/blkid -L "$BOOT_LABEL")"
   [ ! -z "$BOOT_DEVICE" ] && break
-  sleep 1
+  /bin/sleep 1
 done
 
 if [ -z "$BOOT_DEVICE" ] ; then
   /bin/echo "ERROR: MOS boot device with label: $BOOT_LABEL not found"
-  sleep infinity
+  /bin/sleep infinity
 else 
   /bin/echo "Setting boot device to: $BOOT_DEVICE"
 fi
