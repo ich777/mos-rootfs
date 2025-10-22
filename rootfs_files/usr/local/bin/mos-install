@@ -1,0 +1,233 @@
+#!/bin/sh
+
+# Check if disk was passed over
+if [ -z "$1" ] ; then
+  echo "ERROR: You have to pass over a disk"
+  exit 1
+fi
+
+# Clean Device path
+DISK="${1#/dev/}"
+DISK="/dev/$DISK"
+
+# Check if partition is specified in path
+case $DISK in
+  /dev/sd[a-z]|/dev/vd[a-z]|/dev/nvme[0-9]*n[0-9]*)
+    ;;
+  /dev/sd[a-z][0-9]*|/dev/vd[a-z][0-9]*|/dev/nvme[0-9]*n[0-9]*p[0-9]*)
+    echo "ERROR: Please specify a whole disk without the Parititon"
+    exit 1
+    ;;
+  *)
+    echo "ERROR: Unknown disk specified"
+    exit 1
+    ;;
+esac
+
+# Check if device actually exists
+if [ ! -e "$DISK" ] ; then
+  echo "ERROR: Disk $DISK not found"
+  exit 1
+fi
+
+# Check if filesystem type was passed over, if
+# not default to xfs
+if [ -z "$2" ] ; then
+  echo "No filesystem type defined, defaulting to ext4"
+  FS_TYPE="ext4"
+else
+  FS_TYPE="$2"
+fi
+
+# Check if a valid filesystem type was passed over
+case $FS_TYPE in
+  vfat|ext4|btrfs|xfs)
+    ;;
+  *)
+    echo "ERROR: $FS_TYPE is not a supported filesystem type"
+    echo "       Supported filesystems are:"
+    echo "       - vfat (not recommended for HDD boot)"
+    echo "       - ext4"
+    echo "       - btrfs"
+    echo "       - xfs"
+    exit 1
+    ;;
+esac
+
+# Ask user to continue except when quiet is passed over
+if [ "$3" != "quiet" ] ; then
+  if [ "$FS_TYPE" = "vfat" ] ; then
+    MESSAGE="This will format the whole device $DISK in fat32\n\nATTENTION: Formatting a whole device other than a USB Flash Drive is discuraged\nIf you are using whole disk then maybe consider other filesystem types like:\n  - ext4\n  - btrfs\n  - xfs"
+  elif [ "$FS_TYPE" = "xfs" ] ; then
+    MESSAGE="This will format the device $DISK with two partitions:\n- Partition 1 with 64MB in fat32 for the ESP partition to allow EFI boot\n- Partition 2 with the remaining free space in $FS_TYPE as the data partition\n\nATTENTION: Formatting in xfs will probably cause issues with GRUB displaying\n           error messages and other various unwanted behaviour"
+  else
+    MESSAGE="This will format the device $DISK with two partitions:\n- Partition 1 with 64MB in fat32 for the ESP partition to allow EFI boot\n- Partition 2 with the remaining free space in $FS_TYPE as the data partition"
+  fi
+  echo
+  echo -e "$MESSAGE"
+  echo
+
+  echo -n "Proceeed? [y/n] "
+  read answer
+
+  case "$answer" in
+    [Yy]|[Yy][Ee][Ss])
+      ;;
+    *)
+      echo "Abort"
+      exit 1
+      ;;
+  esac
+fi
+
+# Create directories
+mkdir -p /var/mos/installer/esp /var/mos/installer/boot
+
+# Set LABEL
+LABEL="MOS"
+
+# Define download function
+download_asset() {
+  echo "Downloading GRUB${2}"
+  curl --progress-bar -L \
+  --header "Authorization: Bearer ${TOKEN}" \
+  --header "Accept: application/octet-stream" \
+  --header "X-GitHub-Api-Version: 2022-11-28" \
+  --output "/var/mos/installer/grub.deb${2}" \
+  "https://api.github.com/repos/ich777/mos-grub/releases/assets/$1"
+
+  if [ "$2" = ".md5" ]; then
+    echo "Checking md5"
+    if [ "$(md5sum /var/mos/installer/grub.deb | awk '{print $1}')" = "$(cat /var/mos/installer/grub.deb${2} | awk '{print $1}')" ] ; then
+      echo "md5 OK"
+    else
+      echo "md5 ERROR"
+      exit 1
+    fi
+  fi
+}
+
+# Set Token
+TOKEN="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"
+
+# Get GRUB JSON and assets
+GRUB_JSON=$(curl -s --request GET \
+  --url "https://api.github.com/repos/ich777/mos-grub/releases/latest" \
+  --header "Authorization: Bearer ${TOKEN}" \
+  --header "X-GitHub-Api-Version: 2022-11-28")
+
+GRUB_DEB=$(echo $GRUB_JSON | jq -r '.assets[] | select(.name | startswith("mos-grub") and endswith(".deb")) | .id')
+GRUB_DEB_MD5=$(echo $GRUB_JSON | jq -r '.assets[] | select(.name | startswith("mos-grub") and endswith(".deb.md5")) | .id')
+
+# Download GRUB from mos-grub repo
+download_asset "$GRUB_DEB"
+download_asset "$GRUB_DEB_MD5" ".md5"
+
+# Install GRUB
+echo "Installing GRUB"
+dpkg --install /var/mos/installer/grub.deb >/dev/null
+
+# Format disk depending which filesystem is passed over
+if [ "$FS_TYPE" != "vfat" ] ; then
+  # Create partition table and create partitions
+  echo "Wiping old Partitions and creating new Partitions"
+  wipefs -a $DISK
+  parted -s $DISK mklabel gpt
+  parted -s $DISK mkpart ESP fat32 1MiB 65MiB
+  parted -s $DISK set 1 boot on
+  parted -s $DISK mkpart primary $FS_TYPE 65MiB 100%
+
+  # Format ESP partition
+  echo "Formatting ESP Partition with FAT32"
+  if ! mkfs.fat -F32 -c -I ${DISK}1 ; then
+    echo "ERROR: Format from ESP Partition failed"
+    exit 1
+  fi
+  # Set Force flag
+  if [ "$FS_TYPE" = "ext4" ] ; then
+    FORCE_OPT="-F"
+  else
+    FORCE_OPT="-f"
+  fi
+  # Set additinal flags
+  if [ "$FS_TYPE" = "xfs" ] ; then
+    OPT_FLAGS=" -n ftype=0 -m crc=0"
+  else
+    OPT_FLAGS=""
+  fi
+  # Format boot partition
+  echo "Formatting boot Partition with $FS_TYPE"
+  if ! mkfs.${FS_TYPE} ${FORCE_OPT}${OPT_FLAGS} -L "$LABEL" ${DISK}2 ; then
+    echo "ERROR: Format from ESP Partition failed"
+    exit 1
+  fi
+
+  # Mount partitions
+  echo "Mounting Partitions"
+  if ! mount ${DISK}1 /var/mos/installer/esp ; then
+    echo "ERROR: Mount from ESP Partition failed"
+    exit 1
+  fi
+  if ! mount ${DISK}2 /var/mos/installer/boot ; then
+    echo "ERROR: Mount from boot Partition failed"
+    exit 1
+  fi
+
+  # Copy files from current boot device
+  echo "Copying files from boot device"
+  cp -R /boot/* /var/mos/installer/boot/
+
+  # Remove EFI directory since not needed
+  rm -rf /var/mos/installer/boot/EFI
+
+  # Install GRUB bootloader
+  echo "Installing GRUB"
+  if ! grub-install --target=x86_64-efi --efi-directory=/var/mos/installer/esp --boot-directory=/var/mos/installer/boot --removable --recheck --force ; then
+    echo "ERROR: Installing GRUB failed"
+    exit 1
+  fi
+else
+  # Create partition table and create partitions
+  echo "Wiping old Paritions and creating Partition"
+  wipefs -a $DISK
+  parted -s $DISK mklabel gpt
+  parted -s $DISK mkpart ESP fat32 1MiB 100%
+  parted -s $DISK set 1 boot on
+
+  # Format partition
+  echo "Formatting Partition with FAT32"
+  if ! mkfs.fat -F32 -c -I ${DISK}1 ; then
+    echo "ERROR: Formatting failed"
+    exit 1
+  fi
+
+  # Mount partition
+  echo "Mounting Partition"
+  if ! mount ${DISK}1 /var/mos/installer/boot ; then
+    echo "ERROR: Mount from Partition failed"
+    exit 1
+  fi
+
+  # Copy files from current boot device
+  echo "Copying files from boot device"
+  cp -R /boot/* /var/mos/installer/boot/
+
+  # Install GRUB bootloader
+  echo "Installing GRUB"
+  if ! grub-install --target=x86_64-efi --efi-directory=/var/mos/installer/boot --boot-directory=/var/mos/installer/boot --removable --recheck --force ; then
+    echo "ERROR: Installing GRUB failed"
+    exit 1
+  fi
+fi
+# Sync and umount
+echo "Syncinc Filesystems"
+sync
+echo "Unmounting Parititons"
+umount /var/mos/installer/esp
+umount /var/mos/installer/boot
+
+echo "Done!"
+echo
+echo "Please either unplug your old USB Boot device to boot form"
+echo "the new boot device or change the Boot order in your BIOS."
+echo "Please reboot..."
