@@ -13,8 +13,8 @@ jq -n \
   --arg channel "$1" \
   --arg version "$2" \
   --arg recommended_kernel "$3" \
-  --arg frontend "$4" \
-  --arg api "$5" \
+  --arg frontend "$5" \
+  --arg api "$6" \
   '{
     mos: {
       version: $version,
