@@ -244,12 +244,38 @@ jobs:
         cd $ROOTFS
         rm -rf $ROOTFS/root/.* $ROOTFS/var/log/* $ROOTFS/root/* $ROOTFS/tmp/* $ROOTFS/tmp/.* $ROOTFS/var/lib/apt/lists/* $ROOTFS/etc/init.d/.* $ROOTFS/etc/resolv.conf $ROOTFS/var/cache/apt/* $ROOTFS/var/cache/apt/.*
 
+        # Grab latest frontend
+        FRONTEND_JSON=$(curl -s --request GET \
+            --url "https://api.github.com/repos/ich777/mos-frontend/releases/latest" \
+            --header "Authorization: Bearer ${{ secrets.MOS_TOKEN }}" \
+            --header "X-GitHub-Api-Version: 2022-11-28")
+        FRONTEND_V=$(echo $FRONTEND_JSON | jq -r '.tag_name')
+        FRONTEND_ASSET_ID=$(echo $FRONTEND_JSON | jq -r '.assets[] | select(.name | startswith("mos-frontend") and endswith(".tar.gz")) | .id')
+
+        # Download and extract Frontend
+        curl --progress-bar -L \
+          --header "Authorization: Bearer $TOKEN" \
+          --header "Accept: application/octet-stream" \
+          --header "X-GitHub-Api-Version: 2022-11-28" \
+          --output "$WORKDIR/frontend.tar.gz" \
+          "https://api.github.com/repos/ich777/mos-frontend/releases/assets/$FRONTEND_ASSET_ID"
+        tar -C $ROOTFS/var/www/ -xf $WORKDIR/frontend.tar.gz
+        chown -R root:root $ROOTFS/var/www/
+        chmod -R 755 $ROOTFS/var/www/
+
+        # Get latest API
+        git clone https://oauth2:${{ secrets.MOS_TOKEN }}@github.com/ich777/mos-api.git --depth=1 $ROOTFS/usr/local/lib/mos-api
+        API_V=$(date -d @"$(git -C $ROOTFS/usr/local/lib/mos-api log -1 --format=%ct)" "+%Y%m%d-%H%M")
+        rm -rf $ROOTFS/usr/local/lib/mos-api/.git
+        chown -R root:root $ROOTFS/usr/local/lib/mos-api
+        chmod -R 755 $ROOTFS/usr/local/lib/mos-api
+
         CHANNEL=${{ github.event.inputs.mos_channel }}
         VERSION=${{ github.event.inputs.mos_version }}
         RECOMMENDED_KERNEL=${{ github.event.inputs.mos_recommended_kernel }}-mos
 
         chmod +x $WORKDIR/mos-json
-        $WORKDIR/mos-json "$CHANNEL" "$VERSION" "$RECOMMENDED_KERNEL" "$ROOTFS" > $ROOTFS/etc/mos-release.json
+        $WORKDIR/mos-json "$CHANNEL" "$VERSION" "$RECOMMENDED_KERNEL" "$ROOTFS" "$FRONTEND_V" "$API_V" > $ROOTFS/etc/mos-release.json
         chown root:root $ROOTFS/etc/mos-release.json
         chmod 755 $ROOTFS/etc/mos-release.json
         cp $ROOTFS/etc/mos-release.json $WORKDIR/release/mos-release.json
