@@ -127,6 +127,7 @@ check_mos() {
 			&& mkdir -p /boot/config/ssh/root
 		ln -s /boot/config/ssh/root /root/.ssh
 	fi
+	chmod 600 /etc/ssh/ssh_host_*_key*
 }
 
 
