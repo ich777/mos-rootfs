@@ -13,12 +13,16 @@ jq -n \
   --arg channel "$1" \
   --arg version "$2" \
   --arg recommended_kernel "$3" \
+  --arg frontend "$4" \
+  --arg api "$5" \
   '{
     mos: {
       version: $version,
       build: (now | strftime("%Y%m%d-%H%M")),
       recommended_kernel: $recommended_kernel,
       channel: $channel
+      frontend: $frontend
+      api: $api
     },
     base: [{
       os_name: $os_info.NAME,
