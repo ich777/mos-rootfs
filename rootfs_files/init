@@ -46,7 +46,7 @@ BOOT_FS_TYPE=$(/sbin/blkid -s TYPE "$BOOT_DEVICE" | /bin/grep -oP 'TYPE="\K[^"]*
 # Fix permissions if necessary
 fix_boot_permissions() {
   /bin/chown -R root:root /boot 2>/dev/null
-  /bin/chmod -R 644 /boot 2>/dev/null
+  /bin/chmod -R 600 /boot 2>/dev/null
 }
 
 # Mount boot device
