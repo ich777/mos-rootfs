@@ -254,7 +254,7 @@ jobs:
 
         # Download and extract Frontend
         curl --progress-bar -L \
-          --header "Authorization: Bearer $TOKEN" \
+          --header "Authorization: Bearer ${{ secrets.MOS_TOKEN }}" \
           --header "Accept: application/octet-stream" \
           --header "X-GitHub-Api-Version: 2022-11-28" \
           --output "$WORKDIR/frontend.tar.gz" \
