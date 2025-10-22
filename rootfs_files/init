@@ -58,12 +58,16 @@ if [ -z "$BOOT_FS_TYPE" ] ; then
 elif [ "$BOOT_FS_TYPE" = "vfat" ] ; then
   /bin/mount -v -t vfat -o rw,flush,noatime,nodiratime,dmask=77,fmask=177,shortname=mixed $BOOT_DEVICE /boot || { /bin/echo "ERROR: Can't mount device: $BOOT_DEVICE"; /bin/sleep infinity; }
   /bin/echo "$BOOT_DEVICE mounted"
-elif [ "$BOOT_FS_TYPE" = "xfs" ] ; then
-  /bin/mount -v -t xfs -o auto,rw,noatime,nodiratime,discard $BOOT_DEVICE /boot || { /bin/echo "ERROR: Can't mount device: $BOOT_DEVICE"; /bin/sleep infinity; }
+elif [ "$BOOT_FS_TYPE" = "ext4" ] ; then
+  /bin/mount -v -t ext4 -o rw,noatime,discard $BOOT_DEVICE /boot || { /bin/echo "ERROR: Can't mount device: $BOOT_DEVICE"; /bin/sleep infinity; }
   /bin/echo "$BOOT_DEVICE mounted"
   fix_boot_permissions
 elif [ "$BOOT_FS_TYPE" = "btrfs" ] ; then
-  /bin/mount -v -t btrfs -o auto,rw,noatime,nodiratime,degraded,discard=sync $BOOT_DEVICE /boot || { /bin/echo "ERROR: Can't mount device: $BOOT_DEVICE"; /bin/sleep infinity; }
+  /bin/mount -v -t btrfs -o rw,noatime,nodiratime,degraded,discard=sync $BOOT_DEVICE /boot || { /bin/echo "ERROR: Can't mount device: $BOOT_DEVICE"; /bin/sleep infinity; }
+  /bin/echo "$BOOT_DEVICE mounted"
+  fix_boot_permissions
+elif [ "$BOOT_FS_TYPE" = "xfs" ] ; then
+  /bin/mount -v -t xfs -o rw,noatime,nodiratime,discard $BOOT_DEVICE /boot || { /bin/echo "ERROR: Can't mount device: $BOOT_DEVICE"; /bin/sleep infinity; }
   /bin/echo "$BOOT_DEVICE mounted"
   fix_boot_permissions
 else
