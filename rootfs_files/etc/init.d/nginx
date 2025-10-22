@@ -38,15 +38,16 @@ if [ -n "$ULIMIT" ]; then
 	ulimit $ULIMIT
 fi
 
-# MOS custom: development pull frontend
-mos_dev() {
+# MOS custom: update Frontend
+mos_update_frontend() {
   # Get Asset ID
   TOKEN="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"
-  ASSET_ID=$(curl -s --request GET \
+  FRONTEND_JSON=$(curl -s --request GET \
     --url "https://api.github.com/repos/ich777/mos-frontend/releases/latest" \
     --header "Authorization: Bearer $TOKEN" \
-    --header "X-GitHub-Api-Version: 2022-11-28" \
-    | jq -r '.assets[] | select(.name | startswith("mos-frontend") and endswith(".tar.gz")) | .id')
+    --header "X-GitHub-Api-Version: 2022-11-28")
+  FRONTEND_V=$(echo $FRONTEND_JSON | jq -r '.tag_name')
+  FRONTEND_ASSET_ID=$(echo $FRONTEND_JSON | jq -r '.assets[] | select(.name | startswith("mos-frontend") and endswith(".tar.gz")) | .id')
 
   # Remove WebUI
 	rm -rf /var/www/assets /var/www/index.html /var/www/mos* 2>/dev/null
@@ -57,11 +58,11 @@ mos_dev() {
     --header "Accept: application/octet-stream" \
     --header "X-GitHub-Api-Version: 2022-11-28" \
     --output "/tmp/frontend.tar.gz" \
-    "https://api.github.com/repos/ich777/mos-frontend/releases/assets/$ASSET_ID"
+    "https://api.github.com/repos/ich777/mos-frontend/releases/assets/$FRONTEND_ASSET_ID"
   tar -C /var/www/ -xf /tmp/frontend.tar.gz
 	rm -rf /tmp/frontend.tar.gz
 
-	mkdir -p /var/log/nginx >/dev/null 2>&1
+  jq --arg frontend_v "${FRONTEND_V}_updated" '.mos.frontend = $frontend_v' /etc/mos-release.json > /etc/mos-release.json.tmp && mv /etc/mos-release.json.tmp /etc/mos-release.json
 }
 
 start_nginx() {
@@ -72,8 +73,7 @@ start_nginx() {
 	#   1 if daemon was already running
 	#   2 if daemon could not be started
 
-  # MOS custom: development
-  mos_dev
+	mkdir -p /var/log/nginx >/dev/null 2>&1
 
 	start-stop-daemon --start --quiet --pidfile $PID --exec $DAEMON --test > /dev/null \
 		|| return 1
@@ -213,6 +213,32 @@ case "$1" in
 		log_daemon_msg "Upgrading binary" "$NAME"
 		upgrade_nginx
 		log_end_msg $?
+		;;
+	update)
+		log_daemon_msg "Updating mos-frontend" "$NAME"
+
+		# Check configuration before stopping nginx
+		if ! test_config; then
+			log_end_msg 1 # Configuration error
+			exit $?
+		fi
+
+		stop_nginx
+		case "$?" in
+			0|1)
+			  mos_update_frontend
+				start_nginx
+				case "$?" in
+					0) log_end_msg 0 ;;
+					1) log_end_msg 1 ;; # Old process is still running
+					*) log_end_msg 1 ;; # Failed to start
+				esac
+				;;
+			*)
+				# Failed to stop
+				log_end_msg 1
+				;;
+		esac
 		;;
 	rotate)
 		log_daemon_msg "Re-opening $DESC log files" "$NAME"
