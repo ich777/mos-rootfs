@@ -20,8 +20,8 @@ jq -n \
       version: $version,
       build: (now | strftime("%Y%m%d-%H%M")),
       recommended_kernel: $recommended_kernel,
-      channel: $channel
-      frontend: $frontend
+      channel: $channel,
+      frontend: $frontend,
       api: $api
     },
     base: [{
