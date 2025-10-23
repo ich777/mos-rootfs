@@ -113,6 +113,40 @@ done
 env_params="$env_params -e 'TZ'='${timezone}'"
 docker_cmd="$docker_cmd$env_params"
 
+gpu_envs=""
+gpu_devices=""
+gpu_extra_parameters=""
+gpus_json=$(echo "$config" | jq -c '.gpus[]?' 2>/dev/null)
+if [ -n "$gpus_json" ]; then
+  avail_gpus="$(/usr/local/bin/mos-get_gpus)"
+  for i in $(echo "$config" | jq -r '.gpus[]' 2>/dev/null); do
+    gpu_json=$(echo $avail_gpus | jq --arg pciid "$i" '.. | objects | select(.pci== $pciid )')
+    gpu_vendor=$(echo $gpu_json | jq -r '.vendor')
+    if [ "$gpu_vendor" != "null" ] && [ "$gpu_vendor" != "" ]; then
+      if [ "$gpu_vendor" = "NVIDIA" ] ; then
+        [ -z "$gpu_extra_parameters" ] && gpu_extra_parameters="--runtime=nvidia"
+        gpu_uuid=$(echo $gpu_json | jq -r '.uuid')
+        if echo "$gpu_envs" | grep -q "NVIDIA_VISIBLE_DEVICES"; then
+          old_uuids=$(printf "%s\n" "$gpu_envs" | sed -n "s/.*'NVIDIA_VISIBLE_DEVICES'='\([^']*\)'.*/\1/p")
+          new_uuids="${old_uuids},${gpu_uuid}"
+          gpu_envs=$(printf "%s\n" "$gpu_envs" | sed "s|'NVIDIA_VISIBLE_DEVICES'='[^']*'|'NVIDIA_VISIBLE_DEVICES'='${new_uuids}'|")
+        else
+          gpu_envs="$gpu_envs -e 'NVIDIA_VISIBLE_DEVICES'='${gpu_uuid}'"
+        fi
+        ! echo "$gpu_envs" | grep -q 'NVIDIA_DRIVER_CAPABILITIES' && \
+          gpu_envs="$gpu_envs -e 'NVIDIA_DRIVER_CAPABILITIES'='all'"
+      else
+        gpu_card=$(echo $gpu_json | jq -r '.card')
+        gpu_render=$(echo $gpu_json | jq -r '.render')
+        gpu_devices="$gpu_devices --device '${gpu_card}':'${gpu_card}' --device '${gpu_render}':'${gpu_render}'"
+      fi
+    else
+      echo "WARNING: GPU with PCI ID: $i not found, skipping"
+    fi
+  done
+fi
+docker_cmd="$docker_cmd$gpu_envs$gpu_devices"
+
 device_params=""
 for i in $(echo "$config" | jq -r '.devices | keys[]' 2>/dev/null); do
   host_device=$(echo "$config" | jq -r ".devices[$i].host")
@@ -143,6 +177,10 @@ if [ "$web_ui_url" != "null" ] && [ "$web_ui_url" != "null" ]; then
   label_params="$label_params --label 'mos.webui'='$web_ui_url'"
 fi
 docker_cmd="$docker_cmd$label_params"
+
+if [ "$gpu_extra_parameters" != "null" ] && [ "$gpu_extra_parameters" != "" ]; then
+  docker_cmd="$docker_cmd $gpu_extra_parameters"
+fi
 
 if [ "$extra_parameters" != "null" ] && [ "$extra_parameters" != "" ]; then
   docker_cmd="$docker_cmd $extra_parameters"
