@@ -1,0 +1,35 @@
+#!/bin/sh
+
+lspci -nn | grep -E "VGA|3D|Display" | grep -iE "amd|advanced micro devices|intel|nvidia" | while IFS= read -r line; do
+  name=$(echo "$line" | awk -F ': ' '{print $2}' | sed 's/\[[^]]*\] *$//' | sed 's/ \[[0-9a-fA-F:]*\] *//')
+  pci=$(echo "$line" | cut -d ' ' -f1)
+  ids=$(echo "$line" | grep -oE '\[[0-9a-f]{4}:[0-9a-f]{4}\]' | head -1 | tr -d '[]')
+  vendor_id=$(echo "$ids" | cut -d ':' -f1 | tr '[:upper:]' '[:lower:]')
+  device_id=$(echo "$ids" | cut -d ':' -f2)
+  case "$vendor_id" in
+    10de) vendor="NVIDIA" ;;
+    1002) vendor="AMD" ;;
+    8086) vendor="Intel" ;;
+    *) continue ;;
+  esac
+  if [ "$vendor" = "NVIDIA" ]; then
+    uuid=$(grep -l "$pci" /proc/driver/nvidia/gpus/*/information 2>/dev/null | head -1 | xargs cat 2>/dev/null | grep "GPU UUID" | awk '{print $3}')
+    jq -n --arg vendor "$vendor" --arg name "$name" --arg vid "$vendor_id" --arg did "$device_id" --arg pci "$pci" --arg uuid "${uuid:-unknown}" \
+      '{vendor: $vendor, name: $name, vendor_id: $vid, device_id: $did, pci: $pci, uuid: $uuid}'
+  else
+    card_num=$(grep -l "$pci" /sys/class/drm/card*/device/uevent 2>/dev/null | grep -oE 'card[0-9]+' | grep -oE '[0-9]+' | head -1)
+    render_num=$((128 + ${card_num:-0}))
+    jq -n --arg vendor "$vendor" --arg name "$name" --arg vid "$vendor_id" --arg did "$device_id" --arg pci "$pci" \
+      --arg card "/dev/dri/card${card_num:-?}" --arg render "/dev/dri/renderD$render_num" \
+      '{vendor: $vendor, name: $name, vendor_id: $vid, device_id: $did, pci: $pci, card: $card, render: $render}'
+  fi
+done | jq -s '
+  group_by(.vendor) | 
+  map({key: .[0].vendor, value: .}) | 
+  from_entries | 
+  {
+    Intel: (if .Intel then .Intel else null end), 
+    AMD: (if .AMD then .AMD else null end), 
+    NVIDIA: (if .NVIDIA then .NVIDIA else null end)
+  }
+'
