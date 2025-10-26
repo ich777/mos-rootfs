@@ -28,6 +28,11 @@ if [ "$POOLS_MERGERFS" != "" ] && [ "$POOLS_MERGERFS" != "null" ]; then
       SYNC_SCHEDULE=$(echo "$POOLS_JSON" | jq -r ".[] | select(.id == \"$pool\") | .config.sync.schedule")
       SYNC_SCHEDULE=$(convert_schedule "$SYNC_SCHEDULE")
       pools_cron="# MOS $POOL_NAME Parity Sync:"'\n'"$SYNC_SCHEDULE /usr/local/bin/mos-snapraid $POOL_NAME sync > /dev/null 2>&1"'\n'
+      SCRUB_ENABLED=$(echo "$POOLS_JSON" | jq -r ".[] | select(.id == \"$pool\") | .config.sync.scrub.enabled")
+      if [ "$SCRUB_ENABLED" != "" ] && [ "$SCRUB_ENABLED" != "null" ] && [ "$SCRUB_ENABLED" == "true" ]; then
+        SCRUB_SCHEDULE=$(echo "$POOLS_JSON" | jq -r ".[] | select(.id == \"$pool\") | .config.sync.scrub.schedule")
+        pools_cron="$pools_cron# MOS $POOL_NAME Parity Scrub:"'\n'"$SCRUB_SCHEDULE /usr/local/bin/mos-snapraid $POOL_NAME scrub > /dev/null 2>&1"'\n'
+      fi
       CHECK_ENABLED=$(echo "$POOLS_JSON" | jq -r ".[] | select(.id == \"$pool\") | .config.sync.check.enabled")
       if [ "$CHECK_ENABLED" != "" ] && [ "$CHECK_ENABLED" != "null" ] && [ "$CHECK_ENABLED" == "true" ]; then
         CHECK_SCHEDULE=$(echo "$POOLS_JSON" | jq -r ".[] | select(.id == \"$pool\") | .config.sync.check.schedule")
