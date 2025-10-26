@@ -259,6 +259,19 @@ modify_issue() {
   echo "" >> /etc/issue
 }
 
+# Persist history
+persist_history() {
+  PERSIST_HISTORY_ENABLED=$(echo $SYSTEM_JSON | jq -r '.persist_history')
+  if [ "$PERSIST_HISTORY_ENABLED" = "true" ] ; then
+    if [ ! -d "/boot/config/system" ] ; then
+      mkdir -p /boot/config/system
+    fi
+    rm -f /root/.bash_history
+    touch /boot/config/system/.bash_history
+    ln -s /boot/config/system/.bash_history /root/.bash_history
+  fi
+}
+
 if [ "$1" = "os" ] ; then
   STARTUP_SOUND=$(echo $SYSTEM_JSON | jq -r '.notification_sound.startup')
   if [ "$STARTUP_SOUND" != "null" ] && [ "$STARTUP_SOUND" != "false" ] ; then
@@ -268,6 +281,7 @@ if [ "$1" = "os" ] ; then
   start_script
   modify_issue
   start_ntp
+  persist_history
   start_ssh
   start_iscsi_initiator
   mount_disks
