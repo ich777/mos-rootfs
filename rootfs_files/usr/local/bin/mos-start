@@ -227,7 +227,7 @@ start_iscsi_target() {
 mount_remotes() {
   REMOTE_MOUNTS_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.remote_mounting.enabled')
   if [ "$REMOTE_MOUNTS_ENABLED" = "true" ] ; then
-    /usr/local/bin/mos-mount_remotes
+    /usr/local/bin/mos-mount_remotes &
   fi
 }
 
