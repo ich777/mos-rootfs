@@ -95,6 +95,9 @@ cp -R /tmp/node-*/* /usr/
 # /etc/passwd editieren:
 sed -i '/^root::/c root::0:0:root:/root:/bin/bash' /etc/passwd
 
+# make cron less verbose
+echo -e "\n# MOS Custom - make cron less verbose\nEXTRA_OPTS='-L 5'" >> /etc/default/cron
+
 rm -rf /home
 
 rm -rf /usr/include/* /usr/local/games /usr/local/include/* /usr/share/*/include/
