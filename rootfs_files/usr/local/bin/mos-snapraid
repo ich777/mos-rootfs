@@ -1,4 +1,5 @@
 #!/bin/sh
+# Check if SnapRAID configuration is available
 if [ -z "$1" ] ; then
   exit 1
 elif [ ! -f /boot/config/snapraid/$1.conf ] ; then
@@ -9,11 +10,13 @@ if [ -z "$2" ] ; then
   exit 1
 fi
 
+# Check if SnapRAID operation is already running
 if [ "$2" != "force_stop" ] && [ -f /run/snapraid/$1.socket ] ; then
   echo "ERROR: Operation for Pool: $2 already running"
   exit 1
 fi
 
+# Execute force_stop if passed over
 if [ "$2" = "force_stop" ] ; then
   if [ -f /run/snapraid/$1.socket ] ; then
     echo "Trying to stop currently running SnapRAID operation on Pool: $1"
@@ -29,15 +32,24 @@ if [ "$2" = "force_stop" ] ; then
   fi
 fi
 
+# Get Pool information
 POOL_INFO=$(jq --arg pool_name "$1" '.[] | select(.name == $pool_name)' /boot/config/pools.json)
 if [ -z "$POOL_INFO" ] ; then
   echo "ERROR: Pool $1 not found in pools.json"
   exit 1
 fi
 
+# Check if pool is actually mounted
+if ! findmnt /mnt/$1 >/dev/null 2>&1 ; then
+  echo "Pool $1 not mounted, skipping"
+  exit 1
+fi
+
+# Get Disks
 DISKS=$(echo $POOL_INFO | jq -r '.data_devices[].id')
 PARITY=$(echo $POOL_INFO | jq -r '.parity_devices[].id')
 
+# Get power status from disks
 disk_array=()
 for disk in $DISKS
 do
@@ -46,30 +58,37 @@ do
   disk_array+=("$disk:$STANDBY")
 done
 
+# Create Directories
 [ ! -d /var/log/snapraid ] && \
   mkdir -p /var/log/snapraid
 
 [ ! -d /run/snapraid ] && \
   mkdir -p /run/snapraid
 
+# Start SnapRAID operation in background
 {
+  # Send notification and start SnapRAID operation
   notify -t "SnapRAID" -m "Starting SnapRAID operation $2 for Pool: $1" -p "normal"
   snapraid -c /boot/config/snapraid/$1.conf -l /var/log/snapraid/$1 $2 > /run/snapraid/$1.socket 2>&1
 
+  # Sync filesystems and wait for additional 3 minutes
   sync
   sleep 180
 
+  # Put disks into power stat that they where before running the check
   for disk_info in "${disk_array[@]}"; do
     if [ "${disk_info##*:}" = "0" ] ; then
       hdparm -y $(realpath /dev/disk/by-uuid/${disk_info%%:*})
     fi
   done
 
+  # Put parity devices into sleep
   for parity in $PARITY
   do
     hdparm -y $(realpath /dev/disk/by-uuid/$parity)
   done
 
+  # Send end notification and remove socket
   notify -t "SnapRAID" -m "SnapRAID operation $2 for Pool: $1 completed" -p "normal"
 
   rm -f /run/snapraid/$1.socket
