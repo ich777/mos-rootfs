@@ -254,6 +254,6 @@ do
 done
 
 # Make sure to remove temporary LUKS files
-if [ -d /tmp/luks ] ; thn
+if [ -d /tmp/luks ] ; then
   rm -rf /tmp/luks
 fi
