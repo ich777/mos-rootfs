@@ -298,10 +298,10 @@ if [ "$1" = "os" ] ; then
   start_vm
   start_tailscale
   start_netbird
-  start_cron
   start_nginx
   start_api
   mos_spindown
+  start_cron
   end_script
   STARTUP_SOUND=$(echo $SYSTEM_JSON | jq -r '.notification_sound.startup')
   if [ "$STARTUP_SOUND" != "null" ] && [ "$STARTUP_SOUND" != "false" ] ; then
