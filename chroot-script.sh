@@ -35,6 +35,8 @@ if [ -f /etc/rc2.d/S01start-mos ] ; then
 else
   ln -sf ../init.d/start-mos S99start-mos
 fi
+# add cpupower
+ln -sf ../init.d/cpupower S03cpupower
 
 cd /etc/rc0.d
 if [ ! -f /etc/rc0.d/K01stop-mos ] ; then
