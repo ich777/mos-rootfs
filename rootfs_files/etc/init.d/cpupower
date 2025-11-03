@@ -9,7 +9,7 @@
 # Short-Description: set CPUFreq kernel parameters
 ### END INIT INFO
 
-DESC="cpupower Utilities"
+DESC="cpupower"
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 CPUPOWER_SET=/usr/bin/cpupower
@@ -73,7 +73,7 @@ CPUS=$(cat /proc/stat|sed -ne 's/^cpu\([[:digit:]]\+\).*/\1/p')
 RETVAL=0
 case "$1" in
   start|force-reload|restart|reload)
-    log_action_begin_msg "$DESC: Setting $GOVERNOR cpufreq governor"
+    log_action_begin_msg "Starting $DESC: Setting $GOVERNOR cpufreq governor"
       for cpu in $CPUS ; do
         if check_governor_avail "$cpu" ; then
           log_action_cont_msg "CPU${cpu}"
