@@ -85,7 +85,7 @@ cd /etc
 ln -sf /proc/mounts mtab
 
 cd /tmp
-if ! wget -O /tmp/node.xz https://nodejs.org/dist/v22.19.0/node-v22.19.0-linux-x64.tar.xz ; then
+if ! wget -O /tmp/node.xz https://nodejs.org/dist/v24.11.0/node-v24.11.0-linux-x64.tar.xz ; then
   exit 1
 fi
 tar -xf /tmp/node.xz
