@@ -1,0 +1,94 @@
+#!/bin/sh
+# MOS Custom
+### BEGIN INIT INFO
+# Provides:       cpupower
+# Required-Start: $remote_fs
+# Required-Stop:
+# Default-Start:  2 3 4 5
+# Default-Stop:
+# Short-Description: set CPUFreq kernel parameters
+### END INIT INFO
+
+DESC="cpupower"
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+CPUPOWER_SET=/usr/bin/cpupower
+CPUPOWER_OPTIONS=""
+
+# use lsb-base
+. /lib/lsb/init-functions
+
+# Which governor to use. Must be one of the governors listed in:
+#   cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors
+#
+# and which limits to set. Both MIN_SPEED and MAX_SPEED must be values
+# listed in:
+#   cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies
+# a value of 0 for any of the two variables will disabling the use of 
+# that limit variable.
+#
+# WARNING: the correct kernel module must already be loaded or compiled in.
+# 
+#  GOVERNOR="ondemand"
+#  MAX_SPEED=1000
+#  MIN_SPEED=500
+
+# Set defaults
+SYSTEM_JSON=$(jq '.' /boot/config/system.json)
+GOVERNOR=$(echo $SYSTEM_JSON | jq -r '.cpufreq.governor')
+MAX_SPEED=$(echo $SYSTEM_JSON | jq -r '.cpufreq.max_speed')
+MIN_SPEED=$(echo $SYSTEM_JSON | jq -r '.cpufreq.min_speed')
+
+check_governor_avail() {
+  info="/sys/devices/system/cpu/cpu${1}/cpufreq/scaling_available_governors"
+  if [ -f $info ] && grep -q "\<$GOVERNOR\>" $info ; then
+    return 0;
+  # Fallback for Intel P-State driver if governor is not found
+  elif [ -f $info ] && grep -q "performance" $info ; then
+    GOVERNOR="performance"
+    return 0;
+  fi
+  return 1;
+}
+
+[ -x $CPUPOWER_SET ] || exit 0
+
+CPUPOWER_OPTIONS="frequency-set"
+
+if [ "$GOVERNOR" != "null" ] && [ ! -z "$GOVERNOR" ] ; then
+  CPUPOWER_OPTIONS="$CPUPOWER_OPTIONS --governor $GOVERNOR"
+else
+  CPUPOWER_OPTIONS="$CPUPOWER_OPTIONS --governor ondemand"
+fi
+
+if [ ! -z "$MAX_SPEED" ] && [ "$MAX_SPEED" != "null" ] && [ "$MAX_SPEED" != "0" ] ; then
+  CPUPOWER_OPTIONS="$CPUPOWER_OPTIONS --max $MAX_SPEED"
+fi
+
+if [ ! -z "$MIN_SPEED" ] && [ "$MIN_SPEED" != "null" ] && [ "$MIN_SPEED" != "0" ] ; then
+  CPUPOWER_OPTIONS="$CPUPOWER_OPTIONS --min $MIN_SPEED"
+fi
+
+CPUS=$(cat /proc/stat|sed -ne 's/^cpu\([[:digit:]]\+\).*/\1/p')
+RETVAL=0
+case "$1" in
+  start|force-reload|restart|reload)
+    log_action_begin_msg "Starting $DESC: Setting $GOVERNOR cpufreq governor"
+      for cpu in $CPUS ; do
+        if check_governor_avail "$cpu" ; then
+          log_action_cont_msg "CPU${cpu}"
+          $CPUPOWER_SET --cpu $cpu $CPUPOWER_OPTIONS  2>&1 > /dev/null || RETVAL=$?
+        else
+          log_action_cont_msg "CPU${cpu}: $GOVERNOR not available"
+        fi
+      done
+      log_action_end_msg $RETVAL ""
+    ;;
+  stop)
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart|reload|force-reload}"
+    exit 1
+esac
+
+exit 0

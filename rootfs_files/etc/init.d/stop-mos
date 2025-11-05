@@ -84,7 +84,7 @@ stop_mos() {
     /etc/init.d/virtlogd stop
   fi
   if [ -f /var/run/libvirtd.pid ] ; then
-        /etc/init.d/libvirtd stop
+    /etc/init.d/libvirtd stop
   fi
   if [ -f /var/run/tailscale.pid ] ; then
     /etc/init.d/tailscaled stop
@@ -101,13 +101,13 @@ stop_mos() {
 }
 
 case "$1" in
-	stop)
-		log_daemon_msg "Invoking " "$NAME"
-		stop_mos
-		log_progress_msg "$NAME done"
-		log_end_msg 0
-		;;
+  stop)
+    log_daemon_msg "Invoking " "$NAME"
+    stop_mos
+    log_progress_msg "$NAME done"
+    log_end_msg 0
+  ;;
   start)
     exit 0
-    ;;
+  ;;
 esac

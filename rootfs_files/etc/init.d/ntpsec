@@ -23,6 +23,10 @@ PIDFILE=/run/ntpd.pid
 
 test -x $DAEMON || exit 5
 
+# MOS Custom: Make sure that log directory exists
+[ ! -d /var/log/ntpsec ] && \
+  mkdir -p /var/log/ntpsec
+
 if [ -r /etc/default/ntpsec ]; then
 	. /etc/default/ntpsec
 fi
