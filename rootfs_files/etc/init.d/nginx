@@ -246,7 +246,7 @@ case "$1" in
 		log_end_msg $?
 		;;
 	*)
-		echo "Usage: $NAME {start|stop|restart|reload|force-reload|status|configtest|rotate|upgrade}" >&2
+		echo "Usage: $NAME {start|stop|restart|update|reload|force-reload|status|configtest|rotate|upgrade}" >&2
 		exit 3
 		;;
 esac
