@@ -89,6 +89,9 @@ $(ls -1 /boot/optional/drivers/$driver_dir/$UNAME/*.deb 2>/dev/null | cut -d '/'
   for package in $PACKAGES
   do
     NAME=$(echo $package | cut -d '-' -f1)
+    if [ "$NAME" != "${NAME%_*}" ]; then
+      NAME=$(echo $NAME | cut -d '_' -f1)
+    fi
     TYPE=$(echo $package | cut -d '-' -f2- | cut -d '_' -f1)
     VERSION=$(echo $package | cut -d '_' -f2- | cut -d '+' -f1)
     mkdir -p /boot/optional/drivers/$NAME/$UNAME 2>/dev/null
@@ -131,6 +134,9 @@ $(ls -1 /boot/optional/drivers/$driver_dir/$(uname -r)/*.deb 2>/dev/null | cut -
   for driver in $PACKAGES
   do
     NAME=$(echo $driver | cut -d '-' -f1)
+    if [ "$NAME" != "${NAME%_*}" ]; then
+      NAME=$(echo $NAME | cut -d '_' -f1)
+    fi
     TYPE=$(echo $driver | cut -d '-' -f2- | cut -d '_' -f1)
     VERSION=$(echo $driver | cut -d '_' -f2- | cut -d '+' -f1)
     mkdir -p /boot/optional/drivers/$NAME/$UNAME 2>/dev/null
@@ -158,6 +164,9 @@ $(ls -1 /boot/optional/drivers/$driver_dir/$(uname -r)/*.deb 2>/dev/null | cut -
   done
 else
   NAME=$(echo $1 | cut -d '-' -f1)
+  if [ "$NAME" != "${NAME%_*}" ]; then
+    NAME=$(echo $NAME | cut -d '_' -f1)
+  fi
   mkdir -p /boot/optional/drivers/$NAME/$UNAME 2>/dev/null
   DRV="$(echo "$AVAILABLE_DRIVERS" | grep "^${1}")"
   if [ -z "$DRV" ] ; then
