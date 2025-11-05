@@ -283,6 +283,8 @@ if [ "$1" = "os" ] ; then
   start_ntp
   persist_history
   start_ssh
+  start_tailscale
+  start_netbird
   start_iscsi_initiator
   mount_disks
   start_iscsi_target
@@ -296,8 +298,6 @@ if [ "$1" = "os" ] ; then
   docker_autostart
   start_lxc
   start_vm
-  start_tailscale
-  start_netbird
   start_nginx
   start_api
   mos_spindown
