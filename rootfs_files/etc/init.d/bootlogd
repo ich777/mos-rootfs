@@ -31,61 +31,62 @@ SCRIPTNAME=${SCRIPTNAME#[SK]??}
 ACTION="$1"
 case "$0" in
   *stop-bootlog*)
-	[ "$ACTION" = start ] && ACTION=stop
-	;;
+    [ "$ACTION" = start ] && ACTION=stop
+  ;;
 esac
 
-if [ -d /run/systemd/system ]; then
-	if [ "$ACTION" = start ] && [ -f /var/log/boot ]; then
-		echo "(Booted up using systemd which doesn't write logs to system console. Please check 'journalctl -b' instead.)" > /var/log/boot
-	fi
-	log_daemon_msg "Skipping $NAME while running systemd"
-	exit 0
+if [ -d /run/systemd/system ] ; then
+  if [ "$ACTION" = start ] && [ -f /var/log/boot ] ; then
+    echo "(Booted up using systemd which doesn't write logs to system console. Please check 'journalctl -b' instead.)" > /var/log/boot
+  fi
+  log_daemon_msg "Skipping $NAME while running systemd"
+  exit 0
 fi
 
 case "$ACTION" in
   start)
-  	# PATH is set above
-	log_daemon_msg "Starting $DESC" "$NAME"
-	if [ -d /proc/1/. ]
-	then
-		umask 027
-		start-stop-daemon --start --quiet --exec $DAEMON -- \
-			$BOOTLOGD_OPTS
-		ES=$?
-	else
-		$DAEMON $BOOTLOGD_OPTS
-		ES=$?
-	fi
-  # MOS Custom: make sure to always trigger result
-	log_end_msg $ES
-	;;
+    # PATH is set above
+    log_daemon_msg "Starting $DESC" "$NAME"
+    if [ -d /proc/1/. ]
+    then
+      umask 027
+      start-stop-daemon --start --quiet --exec $DAEMON -- \
+        $BOOTLOGD_OPTS
+      ES=$?
+    else
+      $DAEMON $BOOTLOGD_OPTS
+      ES=$?
+    fi
+    # MOS Custom: make sure to always show result
+    log_end_msg $ES
+  ;;
   stop)
-	PATH=/bin:/sbin:/usr/bin:/usr/sbin
-	[ "$VERBOSE" != no ] && log_daemon_msg "Stopping $DESC" "$NAME"
-	start-stop-daemon --oknodo --stop --quiet --exec $DAEMON
-	ES=$?
-	sleep 1
-  # MOS Custom: make sure to always trigger result
-	log_end_msg $ES
-	if [ -r "$TMPLOG" ]
-	then
-		savelog -q -p -n -c 5 /var/log/boot
-		cat "$TMPLOG" >> /var/log/boot
-		rm -f "$TMPLOG"
-	fi
-	;;
+    PATH=/bin:/sbin:/usr/bin:/usr/sbin
+    # MOS Custom: make sure to always show stop message
+    log_daemon_msg "Stopping $DESC" "$NAME"
+    start-stop-daemon --oknodo --stop --quiet --exec $DAEMON
+    ES=$?
+    sleep 1
+    # MOS Custom: make sure to always show result
+    log_end_msg $ES
+    if [ -r "$TMPLOG" ]
+    then
+      savelog -q -p -n -c 5 /var/log/boot
+      cat "$TMPLOG" >> /var/log/boot
+      rm -f "$TMPLOG"
+    fi
+  ;;
   restart|force-reload)
-	"$0" stop
-	"$0" start
-	;;
+    "$0" stop
+    "$0" start
+  ;;
   status)
-	status_of_proc "$DAEMON" "$NAME" && exit 0 || exit $?
-	;;
+    status_of_proc "$DAEMON" "$NAME" && exit 0 || exit $?
+  ;;
   *)
-	echo "Usage: $SCRIPTNAME {start|stop|restart|force-reload|status}" >&2
-	exit 3
-	;;
+    echo "Usage: $SCRIPTNAME {start|stop|restart|force-reload|status}" >&2
+    exit 3
+  ;;
 esac
 
 :
