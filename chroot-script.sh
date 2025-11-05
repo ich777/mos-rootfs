@@ -31,9 +31,9 @@ ln -sf /usr/bin/apt /usr/bin/apt-get
 
 cd /etc/rc2.d
 if [ -f /etc/rc2.d/S01start-mos ] ; then
-  mv /etc/rc2.d/S01start-mos /etc/rc2.d/S99start-mos
+  mv /etc/rc2.d/S01start-mos /etc/rc2.d/S98start-mos
 else
-  ln -sf ../init.d/start-mos S99start-mos
+  ln -sf ../init.d/start-mos S98start-mos
 fi
 # add cpupower
 ln -sf ../init.d/cpupower S03cpupower
@@ -62,6 +62,7 @@ rm -f /etc/rc0.d/K01nginx /etc/rc0.d/K01nmbd /etc/rc0.d/K01nut-client /etc/rc0.d
 
 mv /etc/rcS.d/S11resolvconf /etc/rcS.d/S12resolvconf
 mv /etc/rcS.d/S12networking /etc/rcS.d/S11networking
+mv /etc/rc2.d/S04stop-bootlogd /etc/rc2.d/S99stop-bootlogd
 
 echo "MOS" > /etc/hostname
 
