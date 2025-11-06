@@ -1,2 +1,0 @@
-# MOS Custom
-ACTION=="add", SUBSYSTEM=="block", KERNEL=="[sh]d[a-z]", RUN+="/lib/udev/hdparm", RUN+="/usr/bin/nohup /usr/lib/bin/mos-set_spindown %E{DEVNAME}", RUN+="/usr/bin/setsid /usr/lib/bin/mos-spindown_watchdog %E{DEVNAME}"
