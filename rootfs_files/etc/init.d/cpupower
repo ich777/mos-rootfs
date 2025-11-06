@@ -43,7 +43,7 @@ check_governor_avail() {
   info="/sys/devices/system/cpu/cpu${1}/cpufreq/scaling_available_governors"
   if [ -f $info ] && grep -q "\<$GOVERNOR\>" $info ; then
     return 0;
-  # Fallback for Intel P-State driver if governor is not found
+  # Fallback: try to use performance if governor is not found
   elif [ -f $info ] && grep -q "performance" $info ; then
     GOVERNOR="performance"
     return 0;
