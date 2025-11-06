@@ -5,11 +5,10 @@ echo "WARNING: USAGE of $COMMAND in MOS is discuraged"
 echo -n "Continue? [y/N]: "
 read -r response
 case "$response" in
-    [yY][eE][sS]|[yY]) 
-        exec /usr/bin/$COMMAND.orig "$@"
-        ;;
-    *) 
-        exit 1
-        ;;
+  [yY][eE][sS]|[yY]) 
+    exec /usr/bin/$COMMAND.orig "$@"
+  ;;
+  *) 
+    exit 1
+  ;;
 esac
-
