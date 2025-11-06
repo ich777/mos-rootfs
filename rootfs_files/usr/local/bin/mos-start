@@ -24,6 +24,10 @@ end_script() {
   fi
 }
 
+write_run() {
+  echo "Don't remove this file" > /run/mos-booted
+}
+
 start_notify() {
   /etc/init.d/notify start
 }
@@ -307,6 +311,7 @@ if [ "$1" = "os" ] ; then
   if [ "$STARTUP_SOUND" != "null" ] && [ "$STARTUP_SOUND" != "false" ] ; then
     beep -f 523 -l 100 -n -f 587 -l 100 -n -f 659 -l 200
   fi
+  write_run
 elif [ "$1" = "docker" ] ; then
   start_docker
   docker_network_check
