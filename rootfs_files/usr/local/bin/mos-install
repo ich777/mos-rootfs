@@ -46,7 +46,7 @@ case $FS_TYPE in
   *)
     echo "ERROR: $FS_TYPE is not a supported filesystem type"
     echo "       Supported filesystems are:"
-    echo "       - vfat (not recommended for HDD boot)"
+    echo "       - vfat (not recommended for HDD/SSD/NVME boot)"
     echo "       - ext4"
     echo "       - btrfs"
     echo "       - xfs"
