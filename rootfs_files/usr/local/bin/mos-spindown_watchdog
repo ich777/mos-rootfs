@@ -1,17 +1,35 @@
 #!/bin/sh
+# Exit if no argument is passed over
+if [ -z "$1" ] ; then
+  exit 1
+fi
+
+# Set device variable and check if watchdog is already started
 DEVICE="$1"
 if ! /usr/bin/pgrep -f "/usr/local/bin/mos-spindown_watchdog $DEVICE" >/dev/null ; then
   /usr/bin/logger -t "mos-spindown_watchdog" "Watchdog already running for $DEVICE"
   exit 1
 fi
 
-SPINDOWN=$(/usr/bin/jq -r '.global_spindown' /boot/config/system.json)
+# Try to get UUID and spindown from individual disk
+DEVICE_UUID=$(lsblk -no UUID $DEVICE | xargs)
+if [ ! -z "$DEVICE_UUID" ] ; then
+  SPINDOWN=$(/usr/bin/jq -r --arg uuid "$DEVICE_UUID" '.[].data_devices.[] | select(.id == $uuid) | .spindown // empty' /boot/config/pools.json 2>/dev/null)
+fi
+# If Spindown is empty fall back to global spindown
+if [ -z "$SPINDOWN" ] ; then
+  SPINDOWN=$(/usr/bin/jq -r '.global_spindown' /boot/config/system.json 2>/dev/null)
+fi
+
+# Set check interval in seconds
 INTERVAL=$((SPINDOWN * 60))
 
+# Set function to get I/O count from disk
 get_io_count() {
   /bin/grep " ${DEVICE##*/} " /proc/diskstats | /usr/bin/awk '{print $4 + $8}'
 }
 
+# Setup while loop to check for disk activity or skip if disk is in standby
 while true
 do
   [ ! -b "$DEVICE" ] && \
