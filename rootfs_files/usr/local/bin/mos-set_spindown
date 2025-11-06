@@ -1,13 +1,26 @@
 #!/bin/sh
+# Exit if no argument is passed over
 if [ -z "$1" ] ; then
   exit 1
 fi
 
+# Set device variable
 DEVICE="$1"
-SPINDOWN=$(/usr/bin/jq -r '.global_spindown' /boot/config/system.json)
 
-MODEL=$(/sbin/hdparm -I $DEVICE | /bin/grep "Model Number:" | /usr/bin/cut -d ':' -f2 | tr -d ' ')
+# Try to get UUID and spindown from individual disk
+DEVICE_UUID=$(lsblk -no UUID $DEVICE | xargs)
+if [ ! -z "$DEVICE_UUID" ] ; then
+  SPINDOWN=$(/usr/bin/jq -r --arg uuid "$DEVICE_UUID" '.[].data_devices.[] | select(.id == $uuid) | .spindown // empty' /boot/config/pools.json 2>/dev/null)
+fi
+# If Spindown is empty fall back to global spindown
+if [ -z "$SPINDOWN" ] ; then
+  SPINDOWN=$(/usr/bin/jq -r '.global_spindown' /boot/config/system.json 2>/dev/null)
+fi
 
+# Get HDD model
+MODEL=$(/sbin/hdparm -I $DEVICE 2>/dev/null | /bin/grep "Model Number:" | /usr/bin/cut -d ':' -f2 | tr -d ' ')
+
+# Spindown math function
 if [ "$SPINDOWN" -le 0 ]; then
   SPINDOWN_VALUE=0
 elif [ "$SPINDOWN" -le 20 ]; then
@@ -26,4 +39,5 @@ case "$MODEL" in
     ;;
 esac
 
+# Set spindown
 /sbin/hdparm -S $SPINDOWN_VALUE $DEVICE >/dev/null 2>&1
