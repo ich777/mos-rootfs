@@ -1,0 +1,2 @@
+# MOS: Check if device needs to be auto mounted
+ACTION=="add", SUBSYSTEM=="block", KERNEL=="sd*|nvme*|vd*", RUN+="/usr/local/bin/mos-udev_automount"
