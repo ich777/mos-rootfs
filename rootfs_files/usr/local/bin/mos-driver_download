@@ -1,5 +1,6 @@
 #!/bin/sh
 
+# Check if argument is passed over and set mode acordingly
 if [ -z "$1" ] ; then
   echo "You have to at least specify the driver name"
   exit 1
@@ -15,6 +16,7 @@ else
   MODE="$1"
 fi
 
+# Set Kernel
 if [ -z "$2" ] ; then
   UNAME="$(uname -r)"
 else
@@ -41,6 +43,7 @@ DRIVERS_JSON="$(cat /var/mos/mos-drivers/drivers-$UNAME.json)"
 # Get available driver packages
 AVAILABLE_DRIVERS="$(echo $DRIVERS_JSON | jq -r '.assets[].name | select(endswith(".deb.md5") | not)')"
 
+# Chick if this is an update/upgrade and set mode
 if [ "$MODE" = "update" ] || [ "$MODE" = "upgrade" ] ; then
   # Get installed drivers
   INSTALLED_DRIVERS="$(ls -1 /boot/optional/drivers/ 2>/dev/null)"
@@ -74,13 +77,14 @@ download_asset() {
   fi
 }
 
+# Install/update/upgrade drivers depending on set mode
 if [ "$MODE" = "upgrade" ] ; then
   REBOOT=false
   PACKAGES=""
   for driver_dir in $INSTALLED_DRIVERS
   do
     PACKAGES="$PACKAGES
-$(ls -1 /boot/optional/drivers/$driver_dir/$UNAME/*.deb 2>/dev/null | cut -d '/' -f7)"
+$(ls -1 /boot/optional/drivers/$driver_dir/*/*.deb 2>/dev/null | sort -V | tail -1 | cut -d '/' -f7)"
   done
   PACKAGES="$(echo "$PACKAGES" | sed '/^$/d')"
   for package in $PACKAGES
@@ -182,6 +186,7 @@ else
   echo "Download from driver: $1 successful, please reboot"
 fi
 
+# Cleanup old drivers, or skip if no_driver_cleanup was passed over
 if [ "$3" != "no_driver_cleanup" ] ; then
   for driver_dir in $DRV_SUCCESS
   do
