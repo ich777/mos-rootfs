@@ -155,8 +155,8 @@ xfs_mount_disk() {
 
 # Execute script if one is found after pool is mounted
 mount_script() {
-  if [ -f "/boot/optional/scripts/pools/mount/$1.sh" ] ; then
-    bash /boot/optional/scripts/pools/mount/$1.sh >/dev/null 2>&1 &
+  if [ -f "/boot/optional/scripts/pools/mounted/$1.sh" ] ; then
+    bash /boot/optional/scripts/pools/mounted/$1.sh >/dev/null 2>&1 &
   fi
 }
 
