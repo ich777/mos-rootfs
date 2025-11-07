@@ -1,11 +1,15 @@
 #!/bin/sh
+# Put all JSONs into Variables
 SYSTEM_JSON=$(jq '.' /boot/config/system.json)
 DOCKER_JSON=$(jq '.' /boot/config/docker.json)
 LXC_JSON=$(jq '.' /boot/config/lxc.json)
 VM_JSON=$(jq '.' /boot/config/vm.json)
 NETWORK_JSON=$(jq '.' /boot/config/network.json)
 
+# Execute echo to get one emty line
 echo
+
+# Execute start script if found
 start_script() {
   if [ -f /boot/optional/scripts/pre-start.sh ] ; then
     cp /boot/optional/scripts/pre-start.sh /tmp/pre-start.sh
@@ -15,6 +19,7 @@ start_script() {
   fi
 }
 
+# Execute end script if found
 end_script() {
   if [ -f /boot/optional/scripts/post-start.sh ] ; then
     cp /boot/optional/scripts/post-start.sh /tmp/post-start.sh
@@ -24,18 +29,22 @@ end_script() {
   fi
 }
 
+# Write file to /run that MOS bootscript is done
 write_run() {
   echo "Don't remove this file" > /run/mos-booted
 }
 
+# Start notify service
 start_notify() {
   /etc/init.d/notify start
 }
 
+# Start cron service
 start_cron() {
   /etc/init.d/cron start
 }
 
+# Start ssh service if enabled
 start_ssh() {
   SSH_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.ssh.enabled')
   if [ "$SSH_ENABLED" = "true" ] ; then
@@ -43,6 +52,7 @@ start_ssh() {
   fi
 }
 
+# Start ntpd service if enabled
 start_ntp() {
   NTP_ENABLED=$(echo $SYSTEM_JSON | jq -r '.ntp.enabled')
   if [ "$NTP_ENABLED" = "true" ] ; then
@@ -50,18 +60,22 @@ start_ntp() {
   fi
 }
 
+# Start nginx service for the WebUI
 start_nginx() {
   /etc/init.d/nginx start
 }
 
+# Start MOS API service
 start_api() {
   /etc/init.d/api start
 }
 
+# Mount disks
 mount_disks() {
   /usr/local/bin/mos-mount_disks
 }
 
+# Start NUT UPS service if enabled
 start_nut() {
   NUT_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.nut.enabled')
   if [ "$NUT_ENABLED" = "true" ] ; then
@@ -70,6 +84,7 @@ start_nut() {
   fi
 }
 
+# Install optional .deb packages
 optional_packages() {
   OPTIONAL_PACKAGES=$(ls -1 /boot/optional/packages/)
   if [ ! -z "$OPTIONAL_PACKAGES" ] ; then
@@ -82,6 +97,7 @@ optional_packages() {
   fi
 }
 
+# Create Docker network interface for ipvlan/macvlan
 docker_network_create() {
   DOCKER_NET_CONFIG=$(echo $DOCKER_JSON | jq -r '.docker_net.config')
 
@@ -100,6 +116,7 @@ docker_network_create() {
   $1 >/dev/null 2>&1
 }
 
+# Check if Docker interface for ipvlan/macvlan is already in place
 docker_network_check() {
   DOCKER_NET_MODE=$(echo $DOCKER_JSON | jq -r '.docker_net.mode')
   INTERFACE_MODE=$(echo $NETWORK_JSON | jq -r '.interfaces[] | select(.name == "eth0") | .type')
@@ -108,7 +125,7 @@ docker_network_check() {
   else
     INTERFACE=eth0
   fi
-  # Check for docker networks where the parent is non existent
+  # Check for Docker networks where the parent is non existent
   if [ "$INTERFACE" = "br0" ] ; then
     if docker network inspect eth0 >/dev/null 2>&1; then
       docker network rm --force eth0 >/dev/null 2>&1
@@ -120,7 +137,7 @@ docker_network_check() {
       docker_network_create "$INTERFACE" "$DOCKER_NET_MODE"
     fi
   fi
-  # Check for docker networks with wrong net_mode
+  # Check for Docker networks with wrong net_mode
   if [ "$DOCKER_NET_MODE" = "ipvlan" ] ; then
     if [ "$(docker network inspect $1 >/dev/null 2>&1 | jq -r '.[].Driver')" = "macvlan" ] ; then
       docker network rm --force $1 >/dev/null 2>&1
@@ -132,17 +149,18 @@ docker_network_check() {
       docker_network_create "$INTERFACE" "$DOCKER_NET_MODE"
     fi
   fi
-  # Create docker network if it not exists
+  # Create Docker network if it not exists
   if ! docker network inspect $1 >/dev/null 2>&1; then
     docker_network_create "$INTERFACE" "$DOCKER_NET_MODE"
   fi
 }
 
+# Execute Docker autostart
 docker_autostart() {
   /usr/local/bin/mos-docker_autostart >/dev/null 2>&1 &
 }
 
-# Docker
+# Start Docker service if enabled
 start_docker() {
   DOCKER_ENABLED=$(echo $DOCKER_JSON | jq -r '.enabled')
   if [ "$DOCKER_ENABLED" = "true" ] ; then
@@ -156,7 +174,7 @@ start_docker() {
 }
 
 
-# LXC
+# Start LXC service if enabled (and lxc-net if enabled)
 start_lxc() {
   LXC_ENABLED=$(echo $LXC_JSON | jq -r '.enabled')
   if [ "$LXC_ENABLED" = "true" ] ; then
@@ -170,7 +188,7 @@ start_lxc() {
   fi
 }
 
-# VM
+# Start VM services if enabled
 start_vm() {
   VM_ENABLED=$(echo $VM_JSON | jq -r '.enabled')
   if [ "$VM_ENABLED" = "true" ] ; then
@@ -179,7 +197,7 @@ start_vm() {
   fi
 }
 
-# nmbd
+# Start nmbd service if enabled (SAMBA Discovery)
 start_nmbd() {
   NMBD_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.nmbd.enabled')
   if [ "$NMBD_ENABLED" = "true" ] ; then
@@ -187,7 +205,7 @@ start_nmbd() {
   fi
 }
 
-# Samba
+# Start SAMBA service if enabled
 start_samba() {
   SAMBA_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.samba.enabled')
   if [ "$SAMBA_ENABLED" = "true" ] ; then
@@ -195,6 +213,7 @@ start_samba() {
   fi
 }
 
+# Start Tailscale service if enabled
 start_tailscale() {
   TAILSCALE_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.tailscale.enabled')
   if [ "$TAILSCALE_ENABLED" = "true" ] ; then
@@ -202,6 +221,7 @@ start_tailscale() {
   fi
 }
 
+# Start Netbird service if enabled
 start_netbird() {
   NETBIRD_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.netbird.enabled')
   if [ "$NETBIRD_ENABLED" = "true" ] ; then
@@ -209,6 +229,7 @@ start_netbird() {
   fi
 }
 
+# Execute scripts to set disk standby timeouts and start spindown watchdog for disks
 mos_spindown() {
   DISKS=$(find /dev/ -name sd?)
   for disk in $DISKS
@@ -218,7 +239,7 @@ mos_spindown() {
   done
 }
 
-# iSCSI Target
+# Start iSCSI Target service if enabled
 start_iscsi_target() {
   ISCSI_TARGET_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.iscsi_target.enabled')
   if [ "$ISCSI_TARGET_ENABLED" = "true" ] ; then
@@ -227,7 +248,7 @@ start_iscsi_target() {
 }
 
 
-# Mount Remotes
+# Mount Remotes if remote_mounting is enabled
 mount_remotes() {
   REMOTE_MOUNTS_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.remote_mounting.enabled')
   if [ "$REMOTE_MOUNTS_ENABLED" = "true" ] ; then
@@ -235,7 +256,7 @@ mount_remotes() {
   fi
 }
 
-# iSCSI Initiator
+# Start iSCSI Initiator service if enabled and mount Targets
 start_iscsi_initiator() {
   ISCSI_INITIATOR_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.iscsi_initiator.enabled')
   if [ "$ISCSI_INITIATOR_ENABLED" = "true" ] ; then
@@ -263,7 +284,7 @@ modify_issue() {
   echo "" >> /etc/issue
 }
 
-# Persist history
+# Check if persist history is enabled and create symlink
 persist_history() {
   PERSIST_HISTORY_ENABLED=$(echo $SYSTEM_JSON | jq -r '.persist_history')
   if [ "$PERSIST_HISTORY_ENABLED" = "true" ] ; then
@@ -276,6 +297,7 @@ persist_history() {
   fi
 }
 
+# Define argument conditions
 if [ "$1" = "os" ] ; then
   STARTUP_SOUND=$(echo $SYSTEM_JSON | jq -r '.notification_sound.startup')
   if [ "$STARTUP_SOUND" != "null" ] && [ "$STARTUP_SOUND" != "false" ] ; then
