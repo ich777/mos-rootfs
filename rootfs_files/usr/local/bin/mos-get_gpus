@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# Loop through GPU PCI devices from manufacturer AMD/Intel/Nvidia, sort them
+# by vendor with their device path's or UUIDs and output them as JSON
 lspci -nn | grep -E "VGA|3D|Display" | grep -iE "amd|advanced micro devices|intel|nvidia" | while IFS= read -r line; do
   name=$(echo "$line" | awk -F ': ' '{print $2}' | sed 's/\[[^]]*\] *$//' | sed 's/ \[[0-9a-fA-F:]*\] *//')
   pci=$(echo "$line" | cut -d ' ' -f1)
