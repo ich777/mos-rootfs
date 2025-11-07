@@ -1,5 +1,6 @@
 #!/bin/sh
 
+# Check if argument was passed over (check single or all containers)
 if [ -z "$1" ] ; then
   CONTAINER_UPDATES=()
   notify -t "Docker Update Check" -m "Docker Update Check started in background, you will be notified when the check finished." -p "normal"
@@ -15,33 +16,37 @@ else
   fi
 fi
 
+# Loop through containers
 for container in $CONTAINER_NAMES
 do
+  # Get necessary infromations for check and if there is already a update available
   REPO=$(echo $CONTAINERS_JSON | jq -r --arg name "$container" '.[] | select(.name == $name) | .repo')
   LOCAL_SHA=$(echo $CONTAINERS_JSON | jq -r --arg name "$container" '.[] | select(.name == $name) | .local')
   REMOTE_SHA_OLD=$(echo $CONTAINERS_JSON | jq -r --arg name "$container" '.[] | select(.name == $name) | .remote')
 
+  # Check if a tag is applied, if not add :latest
   if echo "$REPO" | grep -q ':' ; then
     IMAGE="$REPO"
   else
     IMAGE="$REPO:latest"
   fi
 
+  # Get remote SHA
   REMOTE_SHA=$(image-sha $IMAGE)
-
   REMOTE_SHA=$(echo "$REMOTE_SHA" | head -1)
 
+  # Safety check if remote SHA is valid
   case "$REMOTE_SHA" in
     sha*)
       :
       ;;
-
     *)
       echo "ERROR: Error getting latest digest for container: $container"
       continue
       ;;
   esac
 
+  # Compare SHA values and inject new remote SHA to containers file
   if [ "$LOCAL_SHA" != "$REMOTE_SHA" ] ; then
     if [ "$REMOTE_SHA" != "$REMOTE_SHA_OLD" ] ; then
       jq --arg repo "$REPO" \
@@ -71,6 +76,7 @@ do
   fi
 done
 
+# Send notify if all container where checked which containers have updates available
 if [ -z "$1" ] ; then
   if [ ! -z "$CONTAINER_UPDATES" ] ; then
     MSG_UPDATES=$(IFS=','; echo "${CONTAINER_UPDATES[*]}")
