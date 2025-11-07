@@ -9,6 +9,7 @@ else
   POOLS="$1"
 fi
 
+# Create pool directory and mergerfs mount when pool is mergerfs
 create_pool_directory() {
   if [ "$(mount | grep "/mnt/$1")" ] ; then
     return 1
@@ -23,12 +24,14 @@ create_pool_directory() {
   fi
 }
 
+# Create mergerfs disk directory
 mergerfs_create_disk_directory() {
   if [ ! -d /var/mergerfs/$1/disk$2 ] ; then
     mkdir -p /var/mergerfs/$1/disk$2
   fi
 }
 
+# Mount individual mergerfs disk and check for keys if it's a LUKS pool
 mergerfs_mount_disk() {
   if [ ! "$(findmnt /var/mergerfs/$3/disk$4)" ]; then
     if [ "$5" == "true" ] ; then
@@ -49,22 +52,26 @@ mergerfs_mount_disk() {
   fi
 }
 
+# Mount mergerfs pool to /mnt
 mergerfs_mount_pool() {
   mergerfs -o defaults,allow_other,use_ino,category.create=$3 $1 /mnt/$2
 }
 
+# Create mergerfs pools for ep* policies
 mergerfs_create_paths() {
   if [ ! -d /var/mergerfs/$1/disk$3/$2 ] ; then
     mkdir -p /var/mergerfs/$1/disk$3/$2
   fi
 }
 
+# Create SnapRAID disk directory
 snapraid_create_parity_directory() {
   if [ ! -d /var/snapraid/$1/parity$2 ] ; then
     mkdir -p /var/snapraid/$1/parity$2
   fi
 }
 
+# Mount individual SnapRAID disk and check for keys if it's a LUKS pool
 snapraid_mount_disk() {
   if [ ! "$(findmnt /var/snapraid/$3/parity$4)" ]; then
     if [ "$5" == "true" ] ; then
@@ -85,6 +92,7 @@ snapraid_mount_disk() {
   fi
 }
 
+# Decrypt BTRFS LUKS pool
 btrfs_luks_open() {
   if [ ! -z "$4" ] ; then
     echo "${4//\"/\\\"}" | cryptsetup open /dev/disk/by-uuid/$1 ${2}_${3}
@@ -98,6 +106,7 @@ btrfs_luks_open() {
   fi
 }
 
+# Mount BTRFS Pool
 btrfs_mount_pool() {
   if [ "$3" == "true" ] ; then
     mount ${1}/${2}_1 /mnt/$2
@@ -106,6 +115,7 @@ btrfs_mount_pool() {
   fi
 }
 
+# Mount ext4 disk and check if it's a LUKS encrypted
 ext4_mount_disk() {
   if [ "$3" == "true" ] ; then
     if [ ! -z "$4" ] ; then
@@ -124,6 +134,7 @@ ext4_mount_disk() {
   fi
 }
 
+# Mount xfs disk and check if it's a LUKS encrypted
 xfs_mount_disk() {
   if [ "$3" == "true" ] ; then
     if [ ! -z "$4" ] ; then
@@ -142,6 +153,14 @@ xfs_mount_disk() {
   fi
 }
 
+# Execute script if one is found after pool is mounted
+mount_script() {
+  if [ -f "/boot/optional/scripts/pools/mount/$1.sh" ] ; then
+    bash /boot/optional/scripts/pools/mount/$1.sh >/dev/null 2>&1 &
+  fi
+}
+
+# Loop through pools and try to mount them if automount is enabled
 for POOL in $POOLS
 do
   POOL=$(echo "$POOL" | xargs)
@@ -250,6 +269,7 @@ do
       continue 2
     fi
   fi
+  mount_script "$POOL"
   unset POOL_JSON DISK_COUNT DISK_NO MOUNTS PARITY_COUNT POOL_ENCRYPTED ENCRYPTED_TEXT KEY EXIT_STATUS
 done
 
