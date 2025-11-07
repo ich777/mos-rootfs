@@ -1,4 +1,5 @@
 #!/bin/sh
+# Get defined Targets from json or passed over target
 ISCSI_TARGETS=$(jq -r '.targets[]' /boot/config/system/iscsi/initiator.json)
 if [ -z "$1" ]; then
   TARGETS=$(echo $ISCSI_TARGETS | jq -r '.name')
@@ -6,6 +7,7 @@ else
   TARGETS="$1"
 fi
 
+# Loop through Targets and try to connect targets
 if [ ! -z "$ISCSI_TARGETS" ] ; then
   for target in $TARGETS
   do
