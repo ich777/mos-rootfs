@@ -1,5 +1,6 @@
 #!/bin/sh
 
+# Create directory
 mkdir -p /var/mos/mos-update >/dev/null 2>&1
 
 # Get last 50 releases:
@@ -20,6 +21,8 @@ get_releases() {
   fi
 }
 
+# Check file modification time, if file is older than 5 minutes or
+# doesn't exist get file agian
 if [ ! -f /var/mos/mos-update/releases.json ] ; then
   get_releases
 else
