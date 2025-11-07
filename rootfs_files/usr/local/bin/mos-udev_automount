@@ -16,6 +16,6 @@ DEVICE_UUID=$(lsblk -no UUID $DEVICE | xargs)
 # Check if DEVICE_UUID is in pools.json if yes check if automount is enabled and there is only one data_device
 POOL_NAME=$(jq -r --arg uuid "$DEVICE_UUID" '.[] | select((.data_devices[].id == $uuid // empty) and (.automount == true) and (.data_devices | length) == 1) | .name // empty' /boot/config/pools.json 2>/dev/null)
 
-
+# Mount pool if not empty and display log message
 [ ! -z "$POOL_NAME" ] && logger -t "mos-automount" "Mounting device $DEVICE" && \
   mos-mount_disks "$POOL_NAME"
