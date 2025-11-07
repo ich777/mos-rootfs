@@ -1,4 +1,5 @@
 #!/bin/sh
+# Check passed over argument and if it's an URL or a file
 if [ -z "$1" ] ; then
   echo "ERROR: No argument provided, use either a filename or an URL"
   exit 1
@@ -14,14 +15,17 @@ else
   FILE=$1
 fi
 
+# Check if a Plugin file/URL was passed over and exit
 PLUGIN=$(awk -F'[<>]' '/<PluginURL>/ {print $3; exit}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
 if [ ! -z "$PLUGIN" ] ; then
   echo "Plugins can't be converted"
   exit 1
 fi
 
+# Get Docker appdata location
 DOCKER_APPDATA=$(jq -r '.appdata' /boot/config/docker.json)
 
+# Extract keys
 NAME=$(awk -F'[<>]' '/<Name>/ {print $3; exit}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
 REPO=$(awk -F'[<>]' '/<Repository>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
 REGISTRY=$(awk -F'[<>]' '/<Registry>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
@@ -42,7 +46,7 @@ DONATE=$(awk -F'[<>]' '/<DonateLink>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | s
 REQUIRES=$(awk -F'[<>]' '/<Requires>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
 CONFIGS=$(awk -F'[<>]' '/<Config/ {print $2 " Value=\"" $3"\""}' $FILE)
 
-
+# Construct JSON from extracted keys
 base_json=$(jq -n \
   --arg name "$NAME" \
   --arg repo "$REPO" \
@@ -82,18 +86,21 @@ base_json=$(jq -n \
     labels: []
   }')
 
+# Function for extracting attributes
 extract_attr() {
   xml="$1"
   attr="$2"
   echo "$xml" | grep -o "${attr}=\"[^\"]*\"" | cut -d'"' -f2 | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g'
 }
 
+# Create temp paths
 temp_paths=$(mktemp)
 temp_ports=$(mktemp)
 temp_vars=$(mktemp)
 temp_devices=$(mktemp)
 temp_labels=$(mktemp)
 
+# Loop through configs from XML
 echo "$CONFIGS" | while IFS= read -r config; do
   [ -z "$config" ] && continue
   
@@ -204,12 +211,14 @@ echo "$CONFIGS" | while IFS= read -r config; do
   esac
 done
 
+# Create empty arrys for configs
 paths_array="[]"
 ports_array="[]"
 vars_array="[]"
 devices_array="[]"
 labels_array="[]"
 
+# Create arrays from extracted configs and insert them into variables
 if [ -s "$temp_paths" ]; then
   paths_array=$(jq -s '.' "$temp_paths")
 fi
@@ -226,9 +235,11 @@ if [ -s "$temp_labels" ]; then
   labels_array=$(jq -s '.' "$temp_labels")
 fi
 
+# Set Filename
 FILENAME=${1##*/}
 FILENAME=${FILENAME%.*}.json
 
+# Return combined JSON
 echo "$base_json" | jq \
   --argjson paths "$paths_array" \
   --argjson ports "$ports_array" \
@@ -237,6 +248,7 @@ echo "$base_json" | jq \
   --argjson labels "$labels_array" \
   '. + {paths: $paths, ports: $ports, variables: $variables, devices: $devices, labels: $labels}'
 
+# Remove all temporary files
 rm -f "$temp_paths" "$temp_ports" "$temp_vars" "$temp_devices" "$temp_labels"
 
 if [ "$URL_CONVERT" = "true" ] ; then
