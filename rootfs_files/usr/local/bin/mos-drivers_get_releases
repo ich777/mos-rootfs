@@ -1,11 +1,13 @@
 #!/bin/sh
 
+# Set Kernel
 if [ ! -z "$1" ] ; then
   UNAME="$1"
 else
   UNAME="$(uname -r)"
 fi
 
+# Create directory
 mkdir -p /var/mos/mos-drivers >/dev/null 2>&1
 
 # Get releases:
@@ -26,6 +28,8 @@ get_releases() {
   fi
 }
 
+# Check file modification time, if file is older than 5 minutes or
+# doesn't exist get file agian
 if [ ! -f /var/mos/mos-drivers/drivers-$UNAME.json ] ; then
   get_releases
 else
