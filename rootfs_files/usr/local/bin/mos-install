@@ -30,6 +30,12 @@ if [ ! -e "$DISK" ] ; then
   exit 1
 fi
 
+# Check if device is mounted
+if lsblk -no MOUNTPOINT $DISK | xargs | grep -qv "^$" ; then
+  echo "ERROR: $DISK seems to be mounted, not installing to mounted disk"
+  exit 1
+fi
+
 # Check if filesystem type was passed over, if
 # not default to xfs
 if [ -z "$2" ] ; then
