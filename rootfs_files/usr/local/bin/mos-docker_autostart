@@ -1,4 +1,5 @@
 #!/bin/sh
+# Wait for Docker daemon to start to continue or abort after 30 seconds
 counter=0
 while ! docker info >/dev/null 2>&1 ; do
   if [ $counter -ge 30 ]; then
@@ -11,11 +12,15 @@ done
 
 sleep 2
 
+# Get Autostart and Wait time from containers where autostart is enabled and
+# Docker wait time before Docker autostart is executed
 AUTOSTART_CONTAINERS=$(jq -r '.[] | select(.autostart == true) | "\(.index):\(.name):\(.wait)"' /var/lib/docker/mos/containers 2>/dev/null | sort -n -t: -k1,1)
 DOCKER_WAIT=$(jq -r '.start_wait' /boot/config/docker.json)
 if [ ! -z "$DOCKER_WAIT" ] && [ "$DOCKER_WAIT" != "null" ] && [ "$DOCKER_WAIT" != "0" ]; then
   sleep ${DOCKER_WAIT}s
 fi
+
+# Start containers and apply wait time if defined before container is started
 if [ ! -z "$AUTOSTART_CONTAINERS" ] && [ "$AUTOSTART_CONTAINERS" != "null" ] ; then
   for container in $AUTOSTART_CONTAINERS
   do
@@ -27,4 +32,5 @@ if [ ! -z "$AUTOSTART_CONTAINERS" ] && [ "$AUTOSTART_CONTAINERS" != "null" ] ; t
   done
 fi
 
+# Start Docker container network watchdog
 /etc/init.d/docker-watchdog start
