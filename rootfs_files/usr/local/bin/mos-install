@@ -13,15 +13,15 @@ DISK="/dev/$DISK"
 # Check if partition is specified in path
 case $DISK in
   /dev/sd[a-z]|/dev/vd[a-z]|/dev/nvme[0-9]*n[0-9]*)
-    ;;
+  ;;
   /dev/sd[a-z][0-9]*|/dev/vd[a-z][0-9]*|/dev/nvme[0-9]*n[0-9]*p[0-9]*)
     echo "ERROR: Please specify a whole disk without the Parititon"
     exit 1
-    ;;
+  ;;
   *)
     echo "ERROR: Unknown disk specified"
     exit 1
-    ;;
+  ;;
 esac
 
 # Check if device actually exists
@@ -42,7 +42,7 @@ fi
 # Check if a valid filesystem type was passed over
 case $FS_TYPE in
   vfat|ext4|btrfs|xfs)
-    ;;
+  ;;
   *)
     echo "ERROR: $FS_TYPE is not a supported filesystem type"
     echo "       Supported filesystems are:"
@@ -51,7 +51,7 @@ case $FS_TYPE in
     echo "       - btrfs"
     echo "       - xfs"
     exit 1
-    ;;
+  ;;
 esac
 
 # Ask user to continue except when quiet is passed over
@@ -72,11 +72,11 @@ if [ "$3" != "quiet" ] ; then
 
   case "$answer" in
     [Yy]|[Yy][Ee][Ss])
-      ;;
+    ;;
     *)
       echo "Abort"
       exit 1
-      ;;
+    ;;
   esac
 fi
 
@@ -85,6 +85,16 @@ mkdir -p /var/mos/installer/esp /var/mos/installer/boot
 
 # Set LABEL
 LABEL="MOS"
+
+# If it's a NVME add p for partitions
+case $DISK in
+  /dev/nvme[0-9]*n[0-9]*)
+    PARTITION="p"
+  ;;
+  *)
+    PARTITION=""
+  ;;
+esac
 
 # Define download function
 download_asset() {
@@ -139,7 +149,7 @@ if [ "$FS_TYPE" != "vfat" ] ; then
 
   # Format ESP partition
   echo "Formatting ESP Partition with FAT32"
-  if ! mkfs.fat -F32 -c -I ${DISK}1 ; then
+  if ! mkfs.fat -F32 -c -I ${DISK}${PARTITION}1 ; then
     echo "ERROR: Format from ESP Partition failed"
     exit 1
   fi
@@ -157,18 +167,18 @@ if [ "$FS_TYPE" != "vfat" ] ; then
   fi
   # Format boot partition
   echo "Formatting boot Partition with $FS_TYPE"
-  if ! mkfs.${FS_TYPE} ${FORCE_OPT}${OPT_FLAGS} -L "$LABEL" ${DISK}2 ; then
+  if ! mkfs.${FS_TYPE} ${FORCE_OPT}${OPT_FLAGS} -L "$LABEL" ${DISK}${PARTITION}2 ; then
     echo "ERROR: Format from ESP Partition failed"
     exit 1
   fi
 
   # Mount partitions
   echo "Mounting Partitions"
-  if ! mount ${DISK}1 /var/mos/installer/esp ; then
+  if ! mount ${DISK}${PARTITION}1 /var/mos/installer/esp ; then
     echo "ERROR: Mount from ESP Partition failed"
     exit 1
   fi
-  if ! mount ${DISK}2 /var/mos/installer/boot ; then
+  if ! mount ${DISK}${PARTITION}2 /var/mos/installer/boot ; then
     echo "ERROR: Mount from boot Partition failed"
     exit 1
   fi
@@ -196,14 +206,14 @@ else
 
   # Format partition
   echo "Formatting Partition with FAT32"
-  if ! mkfs.fat -F32 -c -I ${DISK}1 ; then
+  if ! mkfs.fat -F32 -c -I ${DISK}${PARTITION}1 ; then
     echo "ERROR: Formatting failed"
     exit 1
   fi
 
   # Mount partition
   echo "Mounting Partition"
-  if ! mount ${DISK}1 /var/mos/installer/boot ; then
+  if ! mount ${DISK}${PARTITION}1 /var/mos/installer/boot ; then
     echo "ERROR: Mount from Partition failed"
     exit 1
   fi
