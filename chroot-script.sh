@@ -6,7 +6,8 @@ DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends --no-i
   iputils-ping jq openssh-server parted nvme-cli xfsprogs btrfs-progs ifupdown resolvconf udev git bridge-utils acpid git smbclient linux-cpupower \
   isc-dhcp-client acpi-support-base nginx tree samba xz-utils rsyslog ntpsec kbd console-data hdparm smartmontools at netcat-openbsd cryptsetup \
   net-tools sysstat pciutils usbutils nut-server beep inotify-tools libjson-glib-1.0-0 libxml2 libpciaccess0 open-iscsi tgt dos2unix dosfstools \
-  iptables libpixman-1-0 libspice-server1 libusbredirparser1 dnsmasq lm-sensors gnutls-bin cron rsync fuse3 nfs-kernel-server nfs-common libpng16-16
+  iptables libpixman-1-0 libspice-server1 libusbredirparser1 dnsmasq lm-sensors gnutls-bin cron rsync fuse3 nfs-kernel-server nfs-common libpng16-16 \
+  wireguard-tools
 
 DEB_APPS=$(ls -1 /tmp/applications/*.deb)
 for deb_app in $DEB_APPS; do
