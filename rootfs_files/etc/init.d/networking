@@ -129,6 +129,8 @@ enable_ipv6() {
   sysctl -wq net.ipv6.conf.default.disable_ipv6=0
   sysctl -wq net.ipv6.conf.lo.disable_ipv6=0
   sysctl -wq net.ipv6.conf.all.forwarding=1
+  sysctl -wq net.ipv6.conf.all.accept_ra=2
+  sysctl -wq net.ipv6.conf.default.accept_ra=2
 }
 
 # MOS custom:
@@ -165,6 +167,16 @@ bridge_add_interface() {
 configure_interfaces() {
   INTERFACES_JSON=$(jq '.interfaces' /boot/config/network.json)
   INTERFACES=$(echo $INTERFACES_JSON | jq -r '.[] | .name')
+
+  # Enable IPv4 forwarding
+  sysctl -wq net.ipv4.ip_forward=1
+
+  # Enable or disable IPv6
+  if [ "${IPV6}" = "false" ] ; then
+    disable_ipv6
+  else
+    enable_ipv6
+  fi
 
   for INTERFACE in $INTERFACES
   do
@@ -227,16 +239,6 @@ configure_interfaces() {
         && interface_config "    bond-mode $BOND_MODE"
       fi
       interface_config ""
-    fi
-
-    # Enable IPv4 forwarding
-    sysctl -wq net.ipv4.ip_forward=1
-
-    # Enable or disable IPv6
-    if [ "${IPV6}" = "false" ] ; then
-      disable_ipv6
-    else
-      enable_ipv6
     fi
 
     unset INTERFACE_JSON BRIDGE_INTERFACES BOND_INTERFACES BOND_MODE TYPE DHCP ADDRESS GATEWAY DNS MODE
