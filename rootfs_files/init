@@ -112,6 +112,15 @@ if [ ! -z "$MODPROBED_FILES" ] ; then
   done
 fi
 
+# Copy default profile.conf to boot device
+if [ ! -f /boot/config/system/profile.conf ] ; then
+  /bin/cp /etc/.mos.profile /boot/config/system/profile.conf
+fi
+# Symlink mos-profile.sh
+if [ ! -f /etc/profile.d/mos-profile.sh ] ; then
+  /bin/ln -sf /boot/config/system/profile.conf /etc/profile.d/mos-profile.sh
+fi
+
 # Install optional drivers
 UNAME=$(/bin/uname -r)
 DRIVERS=$(/bin/ls -1 /boot/optional/drivers/*/${UNAME}/*+mos_*.deb 2>/dev/null)
