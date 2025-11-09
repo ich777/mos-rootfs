@@ -230,7 +230,7 @@ configure_interfaces() {
     fi
 
     # Enable IPv4 forwarding
-    net.ipv4.ip_forward=1
+    sysctl -wq net.ipv4.ip_forward=1
 
     # Enable or disable IPv6
     if [ "${IPV6}" = "false" ] ; then
