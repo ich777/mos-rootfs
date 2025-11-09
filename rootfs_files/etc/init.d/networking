@@ -29,295 +29,303 @@ verbose=""
 [ "$VERBOSE" = yes ] && verbose=-v
 
 process_exclusions() {
-    set -- $EXCLUDE_INTERFACES
-    exclusions=""
-    for d
-    do
-	exclusions="-X $d $exclusions"
-    done
-    echo $exclusions
+  set -- $EXCLUDE_INTERFACES
+  exclusions=""
+  for d
+  do
+    exclusions="-X $d $exclusions"
+  done
+  echo $exclusions
 }
 
 process_options() {
-    [ -e /etc/network/options ] || return 0
-    log_warning_msg "/etc/network/options still exists and it will be IGNORED! Please use /etc/sysctl.conf instead."
+  [ -e /etc/network/options ] || return 0
+  log_warning_msg "/etc/network/options still exists and it will be IGNORED! Please use /etc/sysctl.conf instead."
 }
 
 check_ifstate() {
-    if [ ! -d "$RUN_DIR" ] ; then
-	if ! mkdir -p "$RUN_DIR" ; then
-	    log_failure_msg "can't create $RUN_DIR"
-	    exit 1
-	fi
-	if ! chown root:netdev "$RUN_DIR" ; then
-	    log_warning_msg "can't chown $RUN_DIR"
-	fi
+  if [ ! -d "$RUN_DIR" ] ; then
+    if ! mkdir -p "$RUN_DIR" ; then
+      log_failure_msg "can't create $RUN_DIR"
+      exit 1
     fi
-    if [ ! -r "$IFSTATE" ] ; then
-	if ! :> "$IFSTATE" ; then
-	    log_failure_msg "can't initialise $IFSTATE"
-	    exit 1
-	fi
+    if ! chown root:netdev "$RUN_DIR" ; then
+      log_warning_msg "can't chown $RUN_DIR"
     fi
+  fi
+  if [ ! -r "$IFSTATE" ] ; then
+    if ! :> "$IFSTATE" ; then
+      log_failure_msg "can't initialise $IFSTATE"
+      exit 1
+    fi
+  fi
 }
 
 check_network_file_systems() {
-    [ -e /proc/mounts ] || return 0
+  [ -e /proc/mounts ] || return 0
 
-    if [ -e /etc/iscsi/iscsi.initramfs ]; then
-	log_warning_msg "not deconfiguring network interfaces: iSCSI root is mounted."
-	exit 0
-    fi
+  if [ -e /etc/iscsi/iscsi.initramfs ] ; then
+    log_warning_msg "not deconfiguring network interfaces: iSCSI root is mounted."
+    exit 0
+  fi
 
-    while read DEV MTPT FSTYPE REST; do
-	case $DEV in
-	/dev/nbd*|/dev/nd[a-z]*|/dev/etherd/e*|curlftpfs*)
-	    log_warning_msg "not deconfiguring network interfaces: network devices still mounted."
-	    exit 0
-	    ;;
-	esac
-	case $FSTYPE in
-	nfs|nfs4|smbfs|ncp|ncpfs|cifs|coda|ocfs2|gfs|pvfs|pvfs2|fuse.httpfs|fuse.curlftpfs)
-	    log_warning_msg "not deconfiguring network interfaces: network file systems still mounted."
-	    exit 0
-	    ;;
-	esac
-    done < /proc/mounts
+  while read DEV MTPT FSTYPE REST ; do
+    case $DEV in
+      /dev/nbd*|/dev/nd[a-z]*|/dev/etherd/e*|curlftpfs*)
+        log_warning_msg "not deconfiguring network interfaces: network devices still mounted."
+        exit 0
+      ;;
+    esac
+    case $FSTYPE in
+      nfs|nfs4|smbfs|ncp|ncpfs|cifs|coda|ocfs2|gfs|pvfs|pvfs2|fuse.httpfs|fuse.curlftpfs)
+        log_warning_msg "not deconfiguring network interfaces: network file systems still mounted."
+        exit 0
+      ;;
+    esac
+  done < /proc/mounts
 }
 
 check_network_swap() {
-    [ -e /proc/swaps ] || return 0
+  [ -e /proc/swaps ] || return 0
 
-    while read DEV MTPT FSTYPE REST; do
-	case $DEV in
-	/dev/nbd*|/dev/nd[a-z]*|/dev/etherd/e*)
-	    log_warning_msg "not deconfiguring network interfaces: network swap still mounted."
-	    exit 0
-	    ;;
-	esac
-    done < /proc/swaps
+  while read DEV MTPT FSTYPE REST ; do
+    case $DEV in
+      /dev/nbd*|/dev/nd[a-z]*|/dev/etherd/e*)
+        log_warning_msg "not deconfiguring network interfaces: network swap still mounted."
+        exit 0
+      ;;
+    esac
+  done < /proc/swaps
 }
 
 ifup_hotplug () {
-    if [ -d /sys/class/net ]
-    then
-	    ifaces=$(for iface in $(ifquery --list --allow=hotplug)
-			    do
-				    link=${iface%%:*}
-				    link=${link%%.*}
-				    if [ -e "/sys/class/net/$link" ] && ! ifquery --state "$iface" >/dev/null
-				    then
-					echo "$iface"
-				    fi
-			    done)
-	    if [ -n "$ifaces" ]
-	    then
-		ifup $ifaces "$@" || true
-	    fi
+  if [ -d /sys/class/net ] ; then
+    ifaces=$(for iface in $(ifquery --list --allow=hotplug)
+      do
+        link=${iface%%:*}
+        link=${link%%.*}
+        if [ -e "/sys/class/net/$link" ] && ! ifquery --state "$iface" >/dev/null ; then
+          echo "$iface"
+        fi
+      done)
+    if [ -n "$ifaces" ] ; then
+      ifup $ifaces "$@" || true
     fi
+  fi
 }
 
 # MOS custom:
 disable_ipv6() {
-    log_progress_msg "Disabling IPv6"
-    sysctl -w net.ipv6.conf.all.disable_ipv6=1 >/dev/null
-    sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null
-    sysctl -w net.ipv6.conf.lo.disable_ipv6=1 >/dev/null
+  log_progress_msg "Disabling IPv6"
+  sysctl -wq net.ipv6.conf.all.disable_ipv6=1
+  sysctl -wq net.ipv6.conf.default.disable_ipv6=1
+  sysctl -wq net.ipv6.conf.lo.disable_ipv6=1
+  sysctl -wq net.ipv6.conf.all.forwarding=0
+}
+
+# MOS custom:
+enable_ipv6() {
+  sysctl -wq net.ipv6.conf.all.disable_ipv6=0
+  sysctl -wq net.ipv6.conf.default.disable_ipv6=0
+  sysctl -wq net.ipv6.conf.lo.disable_ipv6=0
+  sysctl -wq net.ipv6.conf.all.forwarding=1
 }
 
 # MOS custom:
 interface_config() {
-    if [ -z "$INTERFACE_CFG" ]; then
-        INTERFACE_CFG="$1"
-    else
-        INTERFACE_CFG="${INTERFACE_CFG}"'\n'"$1"
-    fi
+  if [ -z "$INTERFACE_CFG" ] ; then
+    INTERFACE_CFG="$1"
+  else
+    INTERFACE_CFG="${INTERFACE_CFG}"'\n'"$1"
+  fi
 }
 
 # MOS custom:
 bridge_setup() {
-    if [ ! "$(ifquery --list -a | grep -q $1)" ] ; then
-        brctl addbr $1
-    fi
+  if [ ! "$(ifquery --list -a | grep -q $1)" ] ; then
+    brctl addbr $1
+  fi
 }
 
 # MOS custom:
 bridge_add_interface() {
-    for interface in $2; do
-        if [ ! "$(bridge link show master $1 | grep -q $interface)" ] ; then
-            brctl addif $1 $interface
-            if [ -z "$INTERFACE_ADDITIONAL" ] ; then
-              INTERFACE_ADDITIONAL="auto $interface\niface $interface inet manual\n"
-            else
-              INTERFACE_ADDITIONAL="${INTERFACE_ADDITIONAL}"'\n'"auto $interface\niface $interface inet manual\n"
-            fi
-        fi
-    done
+  for interface in $2 ; do
+    if [ ! "$(bridge link show master $1 | grep -q $interface)" ] ; then
+      brctl addif $1 $interface
+      if [ -z "$INTERFACE_ADDITIONAL" ] ; then
+        INTERFACE_ADDITIONAL="auto $interface\niface $interface inet manual\n"
+      else
+        INTERFACE_ADDITIONAL="${INTERFACE_ADDITIONAL}"'\n'"auto $interface\niface $interface inet manual\n"
+      fi
+    fi
+  done
 }
 
 # MOS custom:
 configure_interfaces() {
-    INTERFACES_JSON=$(jq '.interfaces' /boot/config/network.json)
-    INTERFACES=$(echo $INTERFACES_JSON | jq -r '.[] | .name')
+  INTERFACES_JSON=$(jq '.interfaces' /boot/config/network.json)
+  INTERFACES=$(echo $INTERFACES_JSON | jq -r '.[] | .name')
 
-    for INTERFACE in $INTERFACES
-    do
-        INTERFACE=$(echo "$INTERFACE" | xargs)
-        INTERFACE_JSON=$(echo "$INTERFACES_JSON" | jq --arg interface_name "$INTERFACE" '.[] | select(.name==$interface_name)')
-        IPV6=$(echo $INTERFACE_JSON | jq '.ipv6 | length > 0')
-        TYPE=$(echo "$INTERFACE_JSON" | jq -r '.type')
-        if [ "$TYPE" = "bridged" ] ; then
-            continue
+  for INTERFACE in $INTERFACES
+  do
+    INTERFACE=$(echo "$INTERFACE" | xargs)
+    INTERFACE_JSON=$(echo "$INTERFACES_JSON" | jq --arg interface_name "$INTERFACE" '.[] | select(.name==$interface_name)')
+    IPV6=$(echo $INTERFACE_JSON | jq '.ipv6 | length > 0')
+    TYPE=$(echo "$INTERFACE_JSON" | jq -r '.type')
+    if [ "$TYPE" = "bridged" ] ; then
+      continue
+    fi
+    DHCP=$(echo "$INTERFACE_JSON" | jq -r '.ipv4[].dhcp')
+    if [ "$DHCP" != "false" ] ; then
+      interface_config "auto $INTERFACE"
+      interface_config "iface $INTERFACE inet dhcp"
+      if [ "$TYPE" = "bridge" ] ; then
+        bridge_setup "$INTERFACE"
+        BRIDGE_INTERFACES=$(echo "$INTERFACE_JSON" | jq -r '.interfaces | join(" ")')
+        if [ "$BRIDGE_INTERFACES" != "null" ] ; then
+          interface_config "    bridge_ports $BRIDGE_INTERFACES"
+          bridge_add_interface "$INTERFACE" "$BRIDGE_INTERFACES"
         fi
-        DHCP=$(echo "$INTERFACE_JSON" | jq -r '.ipv4[].dhcp')
-        if [ "$DHCP" != "false" ]; then
-            interface_config "auto $INTERFACE"
-            interface_config "iface $INTERFACE inet dhcp"
-            if [ "$TYPE" = "bridge" ] ; then
-                bridge_setup "$INTERFACE"
-                BRIDGE_INTERFACES=$(echo "$INTERFACE_JSON" | jq -r '.interfaces | join(" ")')
-                if [ "$BRIDGE_INTERFACES" != "null" ] ; then
-                    interface_config "    bridge_ports $BRIDGE_INTERFACES"
-                    bridge_add_interface "$INTERFACE" "$BRIDGE_INTERFACES"
-                fi
-            elif [ "$TYPE" = "bond" ] ; then
-                BOND_INTERFACES=$(echo "$INTERFACE_JSON" | jq -r '.interfaces | join(" ")')
-                BOND_MODE=$(echo "$INTERFACE_JSON" | jq -r '.mode')
-                [ "$BOND_INTERFACES" != "null" ] \
-                    && interface_config "    bond-slaves $BOND_INTERFACES"
-                [ "$BOND_MODE" != "null" ] \
-                    && interface_config "    bond-mode $BOND_MODE"
-                interface_config "    bond-miimon 100"
-            fi
-            interface_config ""
-        else
-            ADDRESS=$(echo "$INTERFACE_JSON" | jq -r '.ipv4[].address')
-            GATEWAY=$(echo "$INTERFACE_JSON" | jq -r '.ipv4[].gateway')
-            DNS=$(echo "$INTERFACE_JSON" | jq -r '.ipv4[].dns | join(" ")')
-            if [ "$TYPE" = "bond" ]; then
-                MODE=$(echo "$INTERFACE_JSON" | jq -r '.mode')
-            fi
-            interface_config "auto $INTERFACE"
-            interface_config "iface $INTERFACE inet static"
-            [ "$ADDRESS" != "null" ] \
-                && interface_config "    address $ADDRESS"
-            [ "$GATEWAY" != "null" ] \
-                && interface_config "    gateway $GATEWAY"
-            [ "$DNS" != "null" ] \
-                && interface_config "    dns-nameservers $DNS"
-            if [ "$TYPE" = "bridge" ] ; then
-                bridge_setup "$INTERFACE"
-                BRIDGE_INTERFACES=$(echo "$INTERFACE_JSON" | jq -r '.interfaces | join(" ")')
-                if [ "$BRIDGE_INTERFACES" != "null" ]; then
-                    interface_config "    bridge_ports $BRIDGE_INTERFACES"
-                    bridge_add_interface "$INTERFACE" "$BRIDGE_INTERFACES"
-                fi
-            elif [ "$TYPE" = "bond" ] ; then
-                BOND_INTERFACES=$(echo "$INTERFACE_JSON" | jq -r '.interfaces | join(" ")')
-                BOND_MODE=$(echo "$INTERFACE_JSON" | jq -r '.mode')
-                [ "$BOND_INTERFACES" != "null" ] \
-                    && interface_config "    bond-slaves $BOND_INTERFACES"
-                [ "$BOND_MODE" != "null" ] \
-                    && interface_config "    bond-mode $BOND_MODE"
-            fi
-            interface_config ""
+      elif [ "$TYPE" = "bond" ] ; then
+        BOND_INTERFACES=$(echo "$INTERFACE_JSON" | jq -r '.interfaces | join(" ")')
+        BOND_MODE=$(echo "$INTERFACE_JSON" | jq -r '.mode')
+        [ "$BOND_INTERFACES" != "null" ] \
+          && interface_config "    bond-slaves $BOND_INTERFACES"
+        [ "$BOND_MODE" != "null" ] \
+          && interface_config "    bond-mode $BOND_MODE"
+        interface_config "    bond-miimon 100"
+      fi
+      interface_config ""
+    else
+      ADDRESS=$(echo "$INTERFACE_JSON" | jq -r '.ipv4[].address')
+      GATEWAY=$(echo "$INTERFACE_JSON" | jq -r '.ipv4[].gateway')
+      DNS=$(echo "$INTERFACE_JSON" | jq -r '.ipv4[].dns | join(" ")')
+      if [ "$TYPE" = "bond" ] ; then
+        MODE=$(echo "$INTERFACE_JSON" | jq -r '.mode')
+      fi
+      interface_config "auto $INTERFACE"
+      interface_config "iface $INTERFACE inet static"
+      [ "$ADDRESS" != "null" ] \
+        && interface_config "    address $ADDRESS"
+      [ "$GATEWAY" != "null" ] \
+        && interface_config "    gateway $GATEWAY"
+      [ "$DNS" != "null" ] \
+        && interface_config "    dns-nameservers $DNS"
+      if [ "$TYPE" = "bridge" ] ; then
+        bridge_setup "$INTERFACE"
+        BRIDGE_INTERFACES=$(echo "$INTERFACE_JSON" | jq -r '.interfaces | join(" ")')
+        if [ "$BRIDGE_INTERFACES" != "null" ] ; then
+          interface_config "    bridge_ports $BRIDGE_INTERFACES"
+          bridge_add_interface "$INTERFACE" "$BRIDGE_INTERFACES"
         fi
-        if [ "${IPV6}" = "false" ]; then
-          disable_ipv6
-        fi
+      elif [ "$TYPE" = "bond" ] ; then
+        BOND_INTERFACES=$(echo "$INTERFACE_JSON" | jq -r '.interfaces | join(" ")')
+        BOND_MODE=$(echo "$INTERFACE_JSON" | jq -r '.mode')
+      [ "$BOND_INTERFACES" != "null" ] \
+        && interface_config "    bond-slaves $BOND_INTERFACES"
+      [ "$BOND_MODE" != "null" ] \
+        && interface_config "    bond-mode $BOND_MODE"
+      fi
+      interface_config ""
+    fi
 
-        unset INTERFACE_JSON BRIDGE_INTERFACES BOND_INTERFACES BOND_MODE TYPE DHCP ADDRESS GATEWAY DNS MODE
-    done
-    echo -e "$INTERFACE_ADDITIONAL$INTERFACE_CFG" > /etc/network/interfaces
+    # Enable IPv4 forwarding
+    net.ipv4.ip_forward=1
+
+    # Enable or disable IPv6
+    if [ "${IPV6}" = "false" ] ; then
+      disable_ipv6
+    else
+      enable_ipv6
+    fi
+
+    unset INTERFACE_JSON BRIDGE_INTERFACES BOND_INTERFACES BOND_MODE TYPE DHCP ADDRESS GATEWAY DNS MODE
+  done
+  echo -e "$INTERFACE_ADDITIONAL$INTERFACE_CFG" > /etc/network/interfaces
 }
 
 case "$1" in
-start)
-	# MOS custom:
-	configure_interfaces
-	process_options
-	check_ifstate
+  start)
+    # MOS custom:
+    configure_interfaces
+    process_options
+    check_ifstate
 
-	if [ "$CONFIGURE_INTERFACES" = no ]
-	then
-	    log_action_msg "Not configuring network interfaces, see /etc/default/networking"
-	    exit 0
-	fi
-	set -f
-	exclusions=$(process_exclusions)
-	log_action_begin_msg "Configuring network interfaces"
-	if [ -x "$(command -v udevadm)" ]; then
-		if [ -n "$(ifquery --list --exclude=lo)" ] || [ -n "$(ifquery --list --allow=hotplug)" ]; then
-			udevadm settle || true
-		fi
-	fi
-	if ifup -a $exclusions $verbose && ifup_hotplug $exclusions $verbose
-	then
-	    log_action_end_msg $?
-	else
-	    log_action_end_msg $?
-	fi
-	;;
+    if [ "$CONFIGURE_INTERFACES" = no ] ; then
+      log_action_msg "Not configuring network interfaces, see /etc/default/networking"
+      exit 0
+    fi
+    set -f
+    exclusions=$(process_exclusions)
+    log_action_begin_msg "Configuring network interfaces"
+    if [ -x "$(command -v udevadm)" ] ; then
+      if [ -n "$(ifquery --list --exclude=lo)" ] || [ -n "$(ifquery --list --allow=hotplug)" ] ; then
+        udevadm settle || true
+      fi
+    fi
+    if ifup -a $exclusions $verbose && ifup_hotplug $exclusions $verbose ; then
+      log_action_end_msg $?
+    else
+      log_action_end_msg $?
+    fi
+  ;;
 
-stop)
-	check_network_file_systems
-	check_network_swap
+  stop)
+    check_network_file_systems
+    check_network_swap
 
-	log_action_begin_msg "Deconfiguring network interfaces"
-	if ifdown -a --exclude=lo $verbose; then
-	    log_action_end_msg $?
-	else
-	    log_action_end_msg $?
-	fi
-	;;
+    log_action_begin_msg "Deconfiguring network interfaces"
+    if ifdown -a --exclude=lo $verbose ; then
+      log_action_end_msg $?
+    else
+      log_action_end_msg $?
+    fi
+  ;;
 
-reload)
-	process_options
+  reload)
+    process_options
 
-	log_action_begin_msg "Reloading network interfaces configuration"
-	state=$(ifquery --state)
-	ifdown -a --exclude=lo $verbose || true
+    log_action_begin_msg "Reloading network interfaces configuration"
+    state=$(ifquery --state)
+    ifdown -a --exclude=lo $verbose || true
 
-	# MOS custom:
-	configure_interfaces
-	process_options
-	check_ifstate
+    # MOS custom:
+    configure_interfaces
+    process_options
+    check_ifstate
 
-	if ifup --exclude=lo $state $verbose ; then
-	    log_action_end_msg $?
-	else
-	    log_action_end_msg $?
-	fi
-	;;
+    if ifup --exclude=lo $state $verbose ; then
+      log_action_end_msg $?
+    else
+      log_action_end_msg $?
+    fi
+  ;;
 
-force-reload|restart)
-	process_options
+  force-reload|restart)
+    process_options
 
-	log_warning_msg "Running $0 $1 is deprecated because it may not re-enable some interfaces"
-	log_action_begin_msg "Reconfiguring network interfaces"
-	ifdown -a --exclude=lo $verbose || true
+    log_warning_msg "Running $0 $1 is deprecated because it may not re-enable some interfaces"
+    log_action_begin_msg "Reconfiguring network interfaces"
+    ifdown -a --exclude=lo $verbose || true
 
-	# MOS custom:
-	configure_interfaces
-	process_options
-	check_ifstate
+    # MOS custom:
+    configure_interfaces
+    process_options
+    check_ifstate
 
-	set -f
-	exclusions=$(process_exclusions)
-	if ifup -a --exclude=lo $exclusions $verbose && ifup_hotplug $exclusions $verbose
-	then
-	    log_action_end_msg $?
-	else
-	    log_action_end_msg $?
-	fi
-	;;
+    set -f
+    exclusions=$(process_exclusions)
+    if ifup -a --exclude=lo $exclusions $verbose && ifup_hotplug $exclusions $verbose ; then
+      log_action_end_msg $?
+    else
+      log_action_end_msg $?
+    fi
+  ;;
 
-*)
-	echo "Usage: /etc/init.d/networking {start|stop|reload|restart|force-reload}"
-	exit 1
-	;;
+  *)
+    echo "Usage: /etc/init.d/networking {start|stop|reload|restart|force-reload}"
+    exit 1
+  ;;
 esac
 
 exit 0
-
-# vim: noet ts=8
