@@ -23,30 +23,30 @@ PID="/run/mos-notify.pid"
 . /lib/lsb/init-functions
 
 start_notify() {
-    start-stop-daemon --start --background --make-pidfile --pidfile $PID --user $USER --exec "$DAEMON" -- $ARGS >/dev/null 2>&1
+  start-stop-daemon --start --background --make-pidfile --pidfile $PID --user $USER --exec "$DAEMON" -- $ARGS >/dev/null 2>&1
 }
 
 stop_notify() {
-    start-stop-daemon --stop --pidfile "$PID"
-	rm -f /run/mos-notify.sock
+  start-stop-daemon --stop --pidfile "$PID"
+  rm -f /run/mos-notify.sock
 }
 
 case "$1" in
   start)
-  log_daemon_msg "Starting $DESC" "$NAME"
-  start_notify
-  log_end_msg 0
+    log_daemon_msg "Starting $DESC" "$NAME"
+    start_notify
+    log_end_msg 0
   ;;
   stop)
 	log_daemon_msg "Stopping $DESC" "$NAME"
     stop_notify
     log_end_msg 0
-    ;;
+  ;;
   restart)
 	log_daemon_msg "Restarting $DESC" "$NAME"
     stop_notify
 	sleep 1
 	start_notify
     log_end_msg 0
-    ;;
+  ;;
 esac
