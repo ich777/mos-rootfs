@@ -48,10 +48,10 @@ chmod -R 777 /etc/nut
 # Explicitly require the configuration to be done in /etc/nut/nut.conf
 # redundant with nut-client
 if [ "x$MODE" = "xnone" -o -z "$MODE" ] ; then
-    log_action_msg "$NAME disabled, please adjust the configuration to your needs"
-    log_action_msg "Then set MODE to a suitable value in $CONFIG to enable it"
-    # exit success to avoid breaking the install process!
-    exit 0
+  log_action_msg "$NAME disabled, please adjust the configuration to your needs"
+  log_action_msg "Then set MODE to a suitable value in $CONFIG to enable it"
+  # exit success to avoid breaking the install process!
+  exit 0
 fi
 
 # Check if /run/nut exists and has the correct perms
@@ -68,11 +68,11 @@ check_status() {
     standalone|netserver)
       status_of_proc -p $upsd_pid $upsd upsd
       # FIXME: need driver(s) status too!
-      ;;
+    ;;
     none|netclient|*)
       # defered to nut-client
       #status_of_proc -p $upsmon_pid $upsmon upsmon
-      ;;
+    ;;
   esac
 }
 
@@ -89,20 +89,20 @@ start_stop_server () {
           start-stop-daemon -S -p $upsd_pid -x $upsd \
             -- $UPSD_OPTIONS >/dev/null 2>&1 || ES=1
           return $ES
-          ;;
+        ;;
         stop)
           # FIXME: should stop nut-client first!
           # Reverse order for stop
           start-stop-daemon -K -o -p $upsd_pid -n upsd || ES=1
           /sbin/upsdrvctl stop >/dev/null 2>&1 || ES=1
           return $ES
-          ;;
+        ;;
       esac
-      ;;
+    ;;
     none|netclient|*)
       # now handled by nut-client
       return 1
-      ;;
+    ;;
   esac
 }
 
@@ -114,8 +114,7 @@ case "$1" in
     start_stop_server start #&& log_progress_msg "upsd"
     #start_stop_client start && log_progress_msg "upsmon"
     log_end_msg $?
-    ;;
-
+  ;;
   stop)
     log_daemon_msg "Stopping $DESC" "$NAME"
     if [ -f "$upsd_pid" ] ; then
@@ -124,13 +123,11 @@ case "$1" in
     log_end_msg $?
     #&& log_progress_msg "upsd"
     #start_stop_client stop && log_progress_msg "upsmon"
-    ;;
-
+  ;;
   reload)
     $upsd   -c reload >/dev/null 2>&1
     #$upsmon -c reload >/dev/null 2>&1
-    ;;
-
+  ;;
   restart|force-reload)
     log_daemon_msg "Restarting $DESC" "$NAME"
     #start_stop_client stop
@@ -140,15 +137,13 @@ case "$1" in
     start_stop_server start #&& log_progress_msg "upsd"
     #start_stop_client start && log_progress_msg "upsmon"
     log_end_msg $?
-    ;;
-
+  ;;
   status)
     #log_daemon_msg "Checking status of $DESC"
     echo "Checking status of $DESC" "$NAME"
     check_status
     exit $?
-    ;;
-
+  ;;
   poweroff)
     wait_delay=`sed -ne 's#^ *POWEROFF_WAIT= *\(.*\)$#\1#p' /etc/nut/nut.conf`
     # UPS poweroff action is actually done here.
@@ -171,18 +166,17 @@ case "$1" in
           sleep "$wait_delay"
           invoke-rc.d reboot stop
         fi
-        ;;
+      ;;
       none|netclient|*)
         # nothing to do
-        ;;
+      ;;
     esac
-    ;;
-
+  ;;
   *)
     N=/etc/init.d/$NAME
     echo "Usage: $N {start|stop|reload|restart|force-reload|status}" >&2
     exit 1
-    ;;
+  ;;
 esac
 
 exit 0
