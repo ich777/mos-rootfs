@@ -1,13 +1,13 @@
 #!/bin/sh
 
 ### BEGIN INIT INFO
-# Provides:	  netbird
-# Required-Start:    $local_fs $remote_fs $network $syslog $named
-# Required-Stop:     $local_fs $remote_fs $network $syslog $named
-# Default-Start:     2 3 4 5
-# Default-Stop:      0 1 6
+# Provides:    netbird
+# Required-Start:  $local_fs $remote_fs $network $syslog $named
+# Required-Stop:   $local_fs $remote_fs $network $syslog $named
+# Default-Start:   2 3 4 5
+# Default-Stop:    0 1 6
 # Short-Description: starts netbird
-# Description:       starts netbird using start-stop-daemon
+# Description:     starts netbird using start-stop-daemon
 ### END INIT INFO
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
@@ -25,97 +25,97 @@ NETBIRD_CONFIG=$(jq '.services.netbird' /boot/config/network.json)
 
 # Update check
 update_check() {
-    if [ ! -d /boot/optional/plugins/netbird ] ; then
-      mkdir -p /boot/optional/plugins/netbird
-    fi
-    if [ ! -d /boot/config/system/netbird_state ] ; then
-      mkdir -p /boot/config/system/netbird_state
-    fi
-    available_version=$(ls -1 /boot/optional/plugins/netbird | cut -d '-' -f2- | sed 's/\.tar.gz$//' | sort -V | tail -1)
-    version_update="false"
-    if [ "$(echo "$NETBIRD_CONFIG" | jq -r '.update_check')" = "true" ] ; then
+  if [ ! -d /boot/optional/plugins/netbird ] ; then
+    mkdir -p /boot/optional/plugins/netbird
+  fi
+  if [ ! -d /boot/config/system/netbird_state ] ; then
+    mkdir -p /boot/config/system/netbird_state
+  fi
+  available_version=$(ls -1 /boot/optional/plugins/netbird | cut -d '-' -f2- | sed 's/\.tar.gz$//' | sort -V | tail -1)
+  version_update="false"
+  if [ "$(echo "$NETBIRD_CONFIG" | jq -r '.update_check')" = "true" ] ; then
+    latest_version=$(wget -qO- https://api.github.com/repos/netbirdio/netbird/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+  fi
+  if [ -z "$available_version" ] ; then
+    if [ -z "$latest_version" ] ; then
       latest_version=$(wget -qO- https://api.github.com/repos/netbirdio/netbird/releases/latest | jq -r '.tag_name' | sed 's/^v//')
     fi
-    if [ -z "$available_version" ] ; then
-      if [ -z "$latest_version" ] ; then
-        latest_version=$(wget -qO- https://api.github.com/repos/netbirdio/netbird/releases/latest | jq -r '.tag_name' | sed 's/^v//')
-      fi
-      if [ -z "$latest_version" ] ; then
-        exit 1
-      fi
-      if ! wget -q -O /boot/optional/plugins/netbird/netbird-$latest_version.tar.gz https://github.com/netbirdio/netbird/releases/download/v$latest_version/netbird_${latest_version}_linux_amd64.tar.gz ; then
-        rm -f /boot/optional/plugins/netbird/netbird-$latest_version.tar.gz
-        exit 1
-      fi
-    elif [ "$(echo "$NETBIRD_CONFIG" | jq -r '.update_check')" = "true" ] && [ "$available_version" != "$latest_version" ] ; then
-      if ! wget -q -O /boot/optional/plugins/netbird/netbird-$latest_version.tar.gz https://github.com/netbirdio/netbird/releases/download/v$latest_version/netbird_${latest_version}_linux_amd64.tar.gz ; then
-        rm -f /boot/optional/plugins/netbird/netbird-$latest_version.tar.gz
-        latest_version=$available_version
-      fi
-    else
+    if [ -z "$latest_version" ] ; then
+      exit 1
+    fi
+    if ! wget -q -O /boot/optional/plugins/netbird/netbird-$latest_version.tar.gz https://github.com/netbirdio/netbird/releases/download/v$latest_version/netbird_${latest_version}_linux_amd64.tar.gz ; then
+      rm -f /boot/optional/plugins/netbird/netbird-$latest_version.tar.gz
+      exit 1
+    fi
+  elif [ "$(echo "$NETBIRD_CONFIG" | jq -r '.update_check')" = "true" ] && [ "$available_version" != "$latest_version" ] ; then
+    if ! wget -q -O /boot/optional/plugins/netbird/netbird-$latest_version.tar.gz https://github.com/netbirdio/netbird/releases/download/v$latest_version/netbird_${latest_version}_linux_amd64.tar.gz ; then
+      rm -f /boot/optional/plugins/netbird/netbird-$latest_version.tar.gz
       latest_version=$available_version
     fi
-    tar -C /usr/sbin -xf /boot/optional/plugins/netbird/netbird-$latest_version.tar.gz netbird
-    rm -f $(ls /boot/optional/plugins/netbird/netbird-*.tar.gz 2>/dev/null | grep -v "${latest_version}")
+  else
+    latest_version=$available_version
+  fi
+  tar -C /usr/sbin -xf /boot/optional/plugins/netbird/netbird-$latest_version.tar.gz netbird
+  rm -f $(ls /boot/optional/plugins/netbird/netbird-*.tar.gz 2>/dev/null | grep -v "${latest_version}")
 }
 
 # MOS custom: Start Netbird
 start_netbird() {
-    netbird_service_params=$(echo "$NETBIRD_CONFIG" | jq -r '.netbird_service_params')
-    if [ "$netbird_service_params" != "null" ] && [ "$netbird_service_params" != "" ]; then
-      ARGS="$ARGS $netbird_service_params"
-    fi
-    start-stop-daemon --start --background --make-pidfile --pidfile $PID --user $USER --exec "$DAEMON" -- $ARGS >/dev/null 2>&1
+  netbird_service_params=$(echo "$NETBIRD_CONFIG" | jq -r '.netbird_service_params')
+  if [ "$netbird_service_params" != "null" ] && [ "$netbird_service_params" != "" ]; then
+    ARGS="$ARGS $netbird_service_params"
+  fi
+  start-stop-daemon --start --background --make-pidfile --pidfile $PID --user $USER --exec "$DAEMON" -- $ARGS >/dev/null 2>&1
 }
 
 # MOS custom: Stop Netbird
 stop_netbird() {
-    start-stop-daemon --stop --pidfile "$PID"
+  start-stop-daemon --stop --pidfile "$PID"
 }
 
 case "$1" in
-	start)
-		log_daemon_msg "Starting $NAME" "$DESC"
-		update_check
-		start_netbird
-		case "$?" in
-			0|1) log_end_msg 0 ;;
-			2)   log_end_msg 1 ;;
-		esac
-		;;
-	stop)
-		log_daemon_msg "Stopping $NAME" "$DESC"
-		stop_netbird
-		case "$?" in
-			0|1) log_end_msg 0 ;;
-			2)   log_end_msg 1 ;;
-		esac
-		;;
-	restart)
-		log_daemon_msg "Restarting $NAME" "$DESC"
+  start)
+    log_daemon_msg "Starting $NAME" "$DESC"
+    update_check
+    start_netbird
+    case "$?" in
+      0|1) log_end_msg 0 ;;
+      2)   log_end_msg 1 ;;
+    esac
+  ;;
+  stop)
+    log_daemon_msg "Stopping $NAME" "$DESC"
+    stop_netbird
+    case "$?" in
+      0|1) log_end_msg 0 ;;
+      2)   log_end_msg 1 ;;
+    esac
+  ;;
+  restart)
+    log_daemon_msg "Restarting $NAME" "$DESC"
 
-		stop_netbird
-		case "$?" in
-			0|1)
-			update_check
-			start_netbird
-			case "$?" in
-				0) log_end_msg 0; check_admin ;;
-				1) log_end_msg 1 ;; # Old process is still running
-				*) log_end_msg 1 ;; # Failed to start
-			esac
-			;;
-			*)
-				# Failed to stop
-				log_end_msg 1
-				;;
-		esac
-		;;
-	status)
-		status_of_proc -p $PID "$DAEMON" "$NAME" && exit 0 || exit $?
-		;;
-	*)
-		echo "Usage: $NAME {start|stop|restart|status}" >&2
-		exit 3
-		;;
+    stop_netbird
+    case "$?" in
+      0|1)
+        update_check
+        start_netbird
+        case "$?" in
+          0) log_end_msg 0; check_admin ;;
+          1) log_end_msg 1 ;; # Old process is still running
+          *) log_end_msg 1 ;; # Failed to start
+        esac
+      ;;
+      *)
+        # Failed to stop
+        log_end_msg 1
+      ;;
+    esac
+  ;;
+  status)
+    status_of_proc -p $PID "$DAEMON" "$NAME" && exit 0 || exit $?
+  ;;
+  *)
+    echo "Usage: $NAME {start|stop|restart|status}" >&2
+    exit 3
+  ;;
 esac
