@@ -19,17 +19,17 @@ RUN_DIR="/run"
 . /lib/lsb/init-functions
 
 start_mos() {
-    /usr/local/bin/mos-start "os" 2>/dev/null
+  /usr/local/bin/mos-start "os" 2>/dev/null
 }
 
 case "$1" in
-	start)
-		log_daemon_msg "Starting $DESC" "$NAME"
-		start_mos
-		log_progress_msg "MOS start done"
-		log_end_msg 0
-		;;
+  start)
+    log_daemon_msg "Starting $DESC" "$NAME"
+    start_mos
+    log_progress_msg "MOS start done"
+    log_end_msg 0
+  ;;
   stop)
     exit 0
-    ;;
+  ;;
 esac
