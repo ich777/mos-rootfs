@@ -22,21 +22,21 @@ RUN_DIR="/run"
 . /lib/lsb/init-functions
 
 start_watchdog() {
-    start-stop-daemon --start --background --make-pidfile --pidfile $PID --user $USER --exec "$DAEMON" -- $ARGS >/dev/null 2>&1
+  start-stop-daemon --start --background --make-pidfile --pidfile $PID --user $USER --exec "$DAEMON" -- $ARGS >/dev/null 2>&1
 }
 
 stop_watchdog() {
-    start-stop-daemon --stop --pidfile "$PID"
+  start-stop-daemon --stop --pidfile "$PID"
 }
 
 case "$1" in
-	start)
-		start_watchdog
-		log_end_msg 0
-		;;
+  start)
+    start_watchdog
+    log_end_msg 0
+  ;;
   stop)
-		stop_watchdog
-		log_end_msg 0
+    stop_watchdog
+    log_end_msg 0
     exit 0
-    ;;
+  ;;
 esac
