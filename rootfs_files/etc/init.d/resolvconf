@@ -41,101 +41,101 @@ ln -s /run/resolvconf/resolv.conf /etc/resolv.conf
 # Abort if Upstart is in use, as per Policy §9.11.1.
 case "$1" in
   start|restart|force-reload)
-	init_is_upstart && exit 1
-	;;
+    init_is_upstart && exit 1
+  ;;
   stop)
-	init_is_upstart && exit 0
-	;;
+    init_is_upstart && exit 0
+  ;;
 esac
 
 # $1 EXITSTATUS
 # [$2 MESSAGE]
 log_action_end_msg_and_exit()
 {
-	log_action_end_msg "$1" ${2:+"$2"}
-	exit $1
+  log_action_end_msg "$1" ${2:+"$2"}
+  exit $1
 }
 
 create_runtime_directories()
 {
-	umask 022
-	if [ ! -d "$RUN_DIR" ] ; then
-		# Create directory at the target
-		mkdir "$RUN_DIR" || log_action_end_msg_and_exit 1 "Error creating directory $RUN_DIR"
-	fi
-	[ -x /sbin/restorecon ] && /sbin/restorecon "$RUN_CANONICALDIR"
+  umask 022
+  if [ ! -d "$RUN_DIR" ] ; then
+    # Create directory at the target
+    mkdir "$RUN_DIR" || log_action_end_msg_and_exit 1 "Error creating directory $RUN_DIR"
+  fi
+  [ -x /sbin/restorecon ] && /sbin/restorecon "$RUN_CANONICALDIR"
 
-	# The resolvconf run directory now exists.
-	if [ ! -d "${RUN_DIR}/interface" ] ; then
-		mkdir "${RUN_DIR}/interface" || log_action_end_msg_and_exit 1 "Error creating directory ${RUN_DIR}/interface"
-	fi
-	[ -x /sbin/restorecon ] && /sbin/restorecon "${RUN_DIR}/interface" "${RUN_DIR}/resolv.conf "${RUN_DIR}/enable-updates
+  # The resolvconf run directory now exists.
+  if [ ! -d "${RUN_DIR}/interface" ] ; then
+    mkdir "${RUN_DIR}/interface" || log_action_end_msg_and_exit 1 "Error creating directory ${RUN_DIR}/interface"
+  fi
+  [ -x /sbin/restorecon ] && /sbin/restorecon "${RUN_DIR}/interface" "${RUN_DIR}/resolv.conf "${RUN_DIR}/enable-updates
 
-	# The interface directory now exists.  We are done.
-	return
+  # The interface directory now exists.  We are done.
+  return
 }
 
 wipe_runtime_directories()
 {
-	# Delete files in the resolvconf run directory (target) but not the directory itself
-	[ -d "$RUN_DIR" ] || return
-	rm -f "$RUN_DIR"/resolv.conf
-	rm -f "$ENABLE_UPDATES_FLAGFILE"
-	rm -f "$POSTPONED_UPDATE_FLAGFILE"
-	rm -rf "${RUN_DIR}/interface/*"
-	return
+  # Delete files in the resolvconf run directory (target) but not the directory itself
+  [ -d "$RUN_DIR" ] || return
+  rm -f "$RUN_DIR"/resolv.conf
+  rm -f "$ENABLE_UPDATES_FLAGFILE"
+  rm -f "$POSTPONED_UPDATE_FLAGFILE"
+  rm -rf "${RUN_DIR}/interface/*"
+  return
 }
 
 case "$1" in
   start)
-	# The "start" method should only be used at boot time.
-	# Don't run this on package upgrade, for example.
-	log_action_begin_msg "Setting up resolvconf"
-	# Wipe runtime directories in case they aren't on a tmpfs
-	wipe_runtime_directories
-	# Create runtime directories in case they are on a tmpfs
-	create_runtime_directories
-	# Request a postponed update (needed in case the base file has content).
-	:> "$POSTPONED_UPDATE_FLAGFILE" || log_action_end_msg_and_exit 1 "failed requesting update"
-	# Enable updates and perform the postponed update.
-	resolvconf --enable-updates || log_action_end_msg_and_exit 1 "failed to enable updates"
-	log_action_end_msg_and_exit 0
-	;;
+    # The "start" method should only be used at boot time.
+    # Don't run this on package upgrade, for example.
+    log_action_begin_msg "Setting up resolvconf"
+    # Wipe runtime directories in case they aren't on a tmpfs
+    wipe_runtime_directories
+    # Create runtime directories in case they are on a tmpfs
+    create_runtime_directories
+    # Request a postponed update (needed in case the base file has content).
+    :> "$POSTPONED_UPDATE_FLAGFILE" || log_action_end_msg_and_exit 1 "failed requesting update"
+    # Enable updates and perform the postponed update.
+    resolvconf --enable-updates || log_action_end_msg_and_exit 1 "failed to enable updates"
+    log_action_end_msg_and_exit 0
+  ;;
   stop)
-	# The "stop" method should only be used at shutdown time.
-	log_action_begin_msg "Stopping resolvconf"
-	resolvconf --disable-updates || log_action_end_msg_and_exit 1 "failed to disable updates"
-	log_action_end_msg_and_exit 0
-	;;
+    # The "stop" method should only be used at shutdown time.
+    log_action_begin_msg "Stopping resolvconf"
+    resolvconf --disable-updates || log_action_end_msg_and_exit 1 "failed to disable updates"
+    log_action_end_msg_and_exit 0
+  ;;
   restart)
-	log_action_begin_msg "Restarting resolvconf"
-	resolvconf --enable-updates || log_action_end_msg_and_exit 1 "failed to enable updates"
-	log_action_end_msg_and_exit 0
-	;;
+    log_action_begin_msg "Restarting resolvconf"
+    resolvconf --enable-updates || log_action_end_msg_and_exit 1 "failed to enable updates"
+    log_action_end_msg_and_exit 0
+  ;;
   reload|force-reload)
-	resolvconf -u || log_action_end_msg_and_exit 1 "failed to update"
-	exit 0
-	;;
+    resolvconf -u || log_action_end_msg_and_exit 1 "failed to update"
+    exit 0
+  ;;
   enable-updates)
-	resolvconf --enable-updates || log_action_end_msg_and_exit 1 "failed to enable updates"
-	exit 0
-	;;
+    resolvconf --enable-updates || log_action_end_msg_and_exit 1 "failed to enable updates"
+    exit 0
+  ;;
   disable-updates)
-	resolvconf --disable-updates || log_action_end_msg_and_exit 1 "failed to disable updates"
-	exit 0
-	;;
+    resolvconf --disable-updates || log_action_end_msg_and_exit 1 "failed to disable updates"
+    exit 0
+  ;;
   status)
-	if resolvconf --updates-are-enabled ; then
-		log_success_msg "resolvconf updates are enabled"
-	else
-		log_failure_msg "resolvconf updates are disabled"
-	fi
-	exit 0
-	;;
+    if resolvconf --updates-are-enabled ; then
+      log_success_msg "resolvconf updates are enabled"
+    else
+      log_failure_msg "resolvconf updates are disabled"
+    fi
+  exit 0
+  ;;
   *)
-	echo "Usage: /etc/init.d/resolvconf {start|stop|restart|reload|force-reload|enable-updates|disable-updates|status}" >&2
-	exit 3
-	;;
+    echo "Usage: /etc/init.d/resolvconf {start|stop|restart|reload|force-reload|enable-updates|disable-updates|status}" >&2
+    exit 3
+  ;;
 esac
 
 # Don't reach here
