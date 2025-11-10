@@ -55,28 +55,25 @@ stop_initiator() {
 
 # See how we were called.
 case "$1" in
-    start)
-        log_daemon_msg "Starting $DESC" $NAME
-        start_initiator
-        log_end_msg $?
-    ;;
-
-    stop)
-        log_daemon_msg "Stopping $DESC" $NAME
-        stop_initiator
-        log_end_msg $?
-    ;;
-
-    restart|reload|force-reload)
-        $0 stop_initiator
-        sleep 1
-        $0 start_initiator
-    ;;
-
-    *)
-        echo "Usage: $0 {start|stop|restart}"
-        exit 2
-    ;;
+  start)
+    log_daemon_msg "Starting $DESC" $NAME
+    start_initiator
+    log_end_msg $?
+  ;;
+  stop)
+    log_daemon_msg "Stopping $DESC" $NAME
+    stop_initiator
+    log_end_msg $?
+  ;;
+  restart|reload|force-reload)
+    $0 stop_initiator
+    sleep 1
+    $0 start_initiator
+  ;;
+  *)
+    echo "Usage: $0 {start|stop|restart}"
+    exit 2
+  ;;
 esac
 
 exit $?
