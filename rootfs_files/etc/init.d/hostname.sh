@@ -18,43 +18,43 @@ PATH=/sbin:/bin
 
 # MOS custom: modification to read hostname from /boot/config/system.json
 do_start () {
-	[ -f /etc/hostname ] || return
+  [ -f /etc/hostname ] || return
 
-	if [ -s /boot/config/system.json ] ; then
-		HOSTNAME=$(/usr/bin/jq -r '.hostname' /boot/config/system.json)
+  if [ -s /boot/config/system.json ] ; then
+    HOSTNAME=$(/usr/bin/jq -r '.hostname' /boot/config/system.json)
     if [ -z "$HOSTNAME" ] || [ "$HOSTNAME" = "null" ]; then
       HOSTNAME="MOS"
     fi
-	else
-		HOSTNAME="MOS"
-	fi
+  else
+    HOSTNAME="MOS"
+  fi
 
-	[ "$VERBOSE" != no ] && log_action_begin_msg "Setting hostname to '$HOSTNAME'"
-	hostname $HOSTNAME
+  [ "$VERBOSE" != no ] && log_action_begin_msg "Setting hostname to '$HOSTNAME'"
+  hostname $HOSTNAME
 
-	ES=$?
-	[ "$VERBOSE" != no ] && log_action_end_msg $ES
-	exit $ES
+  ES=$?
+  [ "$VERBOSE" != no ] && log_action_end_msg $ES
+  exit $ES
 }
 
 case "$1" in
   start|"")
-	do_start
-	;;
+    do_start
+  ;;
   restart|reload|force-reload)
-	echo "Error: argument '$1' not supported" >&2
-	exit 3
-	;;
+    echo "Error: argument '$1' not supported" >&2
+    exit 3
+  ;;
   stop)
-	# No-op
-	;;
+    # No-op
+  ;;
   status)
-	exit 0
-	;;
+    exit 0
+  ;;
   *)
-	echo "Usage: hostname.sh [start|stop]" >&2
-	exit 3
-	;;
+    echo "Usage: hostname.sh [start|stop]" >&2
+    exit 3
+  ;;
 esac
 
 :
