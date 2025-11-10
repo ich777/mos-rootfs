@@ -58,7 +58,7 @@ create_target() {
   IQN=$(echo $TARGET_CONFIG | jq -r ".iqn")
   configure_target "$1" "$IQN"
   LUNS=$(echo $TARGET_CONFIG | jq -r ".luns[].id")
-  for lun_id in $LUNS; do
+  for lun_id in $LUNS ; do
     LUN_CONFIG=$(echo $TARGET_CONFIG | jq -r ".luns[] | select(.id == $lun_id)")
     LUN_MODE=$(echo $LUN_CONFIG | jq -r '.mode')
     LUN_PATH=$(echo $LUN_CONFIG | jq -r '.path')
@@ -69,34 +69,34 @@ create_target() {
     fi
   done
   ALLOWED_INITIATORS=$(echo $TARGET_CONFIG | jq -r ".initiators[].iqn")
-  for allowed_initiator in $ALLOWED_INITIATORS; do
+  for allowed_initiator in $ALLOWED_INITIATORS ; do
     create_bindings "$1" "$allowed_initiator"
   done
 }
 
 start()
 {
-	log_daemon_msg "Starting $DESC" "$NAME"
-	# Start tgtd first.
-	if ! start-stop-daemon --start --quiet --oknodo --pidfile $PIDFILE \
-		--make-pidfile --background --exec $DAEMON -- -f; then
-		log_end_msg 1
-		exit 1
-	fi
+  log_daemon_msg "Starting $DESC" "$NAME"
+  # Start tgtd first.
+  if ! start-stop-daemon --start --quiet --oknodo --pidfile $PIDFILE \
+    --make-pidfile --background --exec $DAEMON -- -f ; then
+    log_end_msg 1
+    exit 1
+  fi
 
   # MOS Custom: Wait 1 second to give service time to start up
   sleep 1
 
-	log_end_msg 0
-	# Put tgtd into "offline" state until all the targets are configured.
-	# We don't want initiators to (re)connect and fail the connection
-	# if it's not ready.
-	tgtadm --op update --mode sys --name State -v offline
-	# MOS Custom: Configure Targets:
-	TARGET_IDS=$(echo $TARGET_JSON | jq -r '.[].id')
+  log_end_msg 0
+  # Put tgtd into "offline" state until all the targets are configured.
+  # We don't want initiators to (re)connect and fail the connection
+  # if it's not ready.
+  tgtadm --op update --mode sys --name State -v offline
+  # MOS Custom: Configure Targets:
+  TARGET_IDS=$(echo $TARGET_JSON | jq -r '.[].id')
   if [ ! -z "$TARGET_IDS" ] && [ "$TARGET_IDS" != "null" ] ; then
     IFS=$'\n'
-    for target_id in $TARGET_IDS; do
+    for target_id in $TARGET_IDS ; do
       if ! echo "$TARGETS_CONFIGURED" | grep -q "^$target_id$" ; then
         create_target "$target_id"
       else
@@ -105,94 +105,94 @@ start()
       fi
     done
   fi
-	# Put tgtd into "ready" state.
-	tgtadm --op update --mode sys --name State -v ready
+  # Put tgtd into "ready" state.
+  tgtadm --op update --mode sys --name State -v ready
 }
 
 stop()
 {
-	# NOTE: Forced shutdown of the iscsi target may cause data corruption
-	# for initiators that are connected.
-	log_daemon_msg "Force-stopping $DESC" "$NAME"
-	# Offline everything first. May be needed if we're rebooting, but
-	# expect the initiators to reconnect cleanly when we boot again
-	# (i.e. we don't want them to reconnect to a tgtd which is still
-	# working, but the target is gone).
-	tgtadm --op update --mode sys --name State -v offline >/dev/null 2>&1
-	RETVAL=$?
-	if [ "$RETVAL" -eq 107 ] ; then
-	    # tgtd not running
-	    log_end_msg 0
-	else
-	    tgt-admin --offline ALL
-	    # Remove all targets, even if they are still in use.
-	    tgt-admin --update ALL -c /dev/null -f
-	    # It will shut down tgtd only after all targets were removed.
-	    tgtadm --op delete --mode system
-	    RETVAL=$?
-	    if [ "$RETVAL" -ne 0 ] ; then
-		log_end_msg 1
-		echo "Failed to shutdown tgtd"
-		exit 1
-	    fi
-	    log_end_msg 0
-	    rm -f $PIDFILE
-	fi
+  # NOTE: Forced shutdown of the iscsi target may cause data corruption
+  # for initiators that are connected.
+  log_daemon_msg "Force-stopping $DESC" "$NAME"
+  # Offline everything first. May be needed if we're rebooting, but
+  # expect the initiators to reconnect cleanly when we boot again
+  # (i.e. we don't want them to reconnect to a tgtd which is still
+  # working, but the target is gone).
+  tgtadm --op update --mode sys --name State -v offline >/dev/null 2>&1
+  RETVAL=$?
+  if [ "$RETVAL" -eq 107 ] ; then
+    # tgtd not running
+    log_end_msg 0
+  else
+    tgt-admin --offline ALL
+    # Remove all targets, even if they are still in use.
+    tgt-admin --update ALL -c /dev/null -f
+    # It will shut down tgtd only after all targets were removed.
+    tgtadm --op delete --mode system
+    RETVAL=$?
+    if [ "$RETVAL" -ne 0 ] ; then
+      log_end_msg 1
+      echo "Failed to shutdown tgtd"
+      exit 1
+    fi
+    log_end_msg 0
+    rm -f $PIDFILE
+  fi
 }
 
 reload()
 {
-	log_daemon_msg "Reloading configuration of $DESC" "$NAME"
-	# Update configuration for targets. Only targets which
-	# are not in use will be updated.
-	tgt-admin --update ALL -c $TGTD_CONFIG >/dev/null 2>&1
-	RETVAL=$?
-	if [ "$RETVAL" -eq 107 ] ; then
-		log_end_msg 1
-		echo "tgtd is not running"
-		exit 1
-	fi
-	log_end_msg 0
+  log_daemon_msg "Reloading configuration of $DESC" "$NAME"
+  # Update configuration for targets. Only targets which
+  # are not in use will be updated.
+  tgt-admin --update ALL -c $TGTD_CONFIG >/dev/null 2>&1
+  RETVAL=$?
+  if [ "$RETVAL" -eq 107 ] ; then
+    log_end_msg 1
+    echo "tgtd is not running"
+    exit 1
+  fi
+  log_end_msg 0
 }
 
 forcedreload()
 {
-	log_daemon_msg "Forced-reload configuration of $DESC" "$NAME"
-	# Update configuration for targets, even those in use.
-	tgt-admin --update ALL -f -c $TGTD_CONFIG >/dev/null 2>&1
-	RETVAL=$?
-	if [ "$RETVAL" -eq 107 ] ; then
-		log_end_msg 1
-		echo "tgtd is not running"
-		exit 1
-	else
-		log_end_msg 0
-	fi
+  log_daemon_msg "Forced-reload configuration of $DESC" "$NAME"
+  # Update configuration for targets, even those in use.
+  tgt-admin --update ALL -f -c $TGTD_CONFIG >/dev/null 2>&1
+  RETVAL=$?
+  if [ "$RETVAL" -eq 107 ] ; then
+    log_end_msg 1
+    echo "tgtd is not running"
+    exit 1
+  else
+    log_end_msg 0
+  fi
 }
 
 case $1 in
-	start)
-		start
-		;;
-	stop|forcedstop)
-		stop
-		;;
-	restart|forcedrestart)
-		stop && start
-		;;
-	reload)
-		reload
-		;;
-	force-reload)
-		forcedreload
-		;;
-	status)
-		status_of_proc -p $PIDFILE /usr/sbin/tgtd tgtd
-		exit $?
-		;;
-	*)
-		echo "Usage: $0 {start|stop|forcedstop|restart|forcedrestart|reload|force-reload|status}"
-		exit 2
-		;;
+  start)
+    start
+  ;;
+  stop|forcedstop)
+    stop
+  ;;
+  restart|forcedrestart)
+    stop && start
+  ;;
+  reload)
+    reload
+  ;;
+  force-reload)
+    forcedreload
+  ;;
+  status)
+    status_of_proc -p $PIDFILE /usr/sbin/tgtd tgtd
+    exit $?
+  ;;
+  *)
+    echo "Usage: $0 {start|stop|forcedstop|restart|forcedrestart|reload|force-reload|status}"
+    exit 2
+  ;;
 esac
 
