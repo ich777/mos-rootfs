@@ -171,7 +171,8 @@ configure_interfaces() {
   # Enable IPv4 forwarding
   sysctl -wq net.ipv4.ip_forward=1
 
-  # Enable or disable IPv6
+  # Enable or Disable IPv6 globally
+  IPV6=$(echo $INTERFACES_JSON | jq -r 'map(select((.type != "bridged") and (.ipv6 | length > 0))) | length > 0')
   if [ "${IPV6}" = "false" ] ; then
     disable_ipv6
   else
@@ -182,7 +183,6 @@ configure_interfaces() {
   do
     INTERFACE=$(echo "$INTERFACE" | xargs)
     INTERFACE_JSON=$(echo "$INTERFACES_JSON" | jq --arg interface_name "$INTERFACE" '.[] | select(.name==$interface_name)')
-    IPV6=$(echo $INTERFACE_JSON | jq '.ipv6 | length > 0')
     TYPE=$(echo "$INTERFACE_JSON" | jq -r '.type')
     if [ "$TYPE" = "bridged" ] ; then
       continue
