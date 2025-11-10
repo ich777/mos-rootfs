@@ -72,6 +72,8 @@ if [ "$cpu_set" != "null" ] && [ "$cpu_set" != "" ]; then
 fi
 
 # Loop through ports and add them to docker_cmd
+# Dont add ports when attached to a container as network
+if [[ $network != container:* ]]; then
 port_params=""
 ports_json=$(echo "$config" | jq -c '.ports[]?' 2>/dev/null)
 if [ -n "$ports_json" ]; then
@@ -86,6 +88,7 @@ if [ -n "$ports_json" ]; then
   done
 fi
 docker_cmd="$docker_cmd$port_params"
+fi
 
 # Loop through paths and add them to docker_cmd
 volume_params=""
