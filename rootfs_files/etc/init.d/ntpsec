@@ -27,16 +27,16 @@ test -x $DAEMON || exit 5
 [ ! -d /var/log/ntpsec ] && \
   mkdir -p /var/log/ntpsec
 
-if [ -r /etc/default/ntpsec ]; then
-	. /etc/default/ntpsec
+if [ -r /etc/default/ntpsec ] ; then
+  . /etc/default/ntpsec
 fi
 
-if [ "$IGNORE_DHCP" != "yes" ] && [ -e /run/ntpsec/ntp.conf.dhcp ]; then
-	NTPD_OPTS="$NTPD_OPTS -c /run/ntpsec/ntp.conf.dhcp"
+if [ "$IGNORE_DHCP" != "yes" ] && [ -e /run/ntpsec/ntp.conf.dhcp ] ; then
+  NTPD_OPTS="$NTPD_OPTS -c /run/ntpsec/ntp.conf.dhcp"
 else
-	# List the default -c first, so if the admin has specified -c in
-	# NTPD_OPTS, it is honored.
-	NTPD_OPTS="-c /etc/ntpsec/ntp.conf $NTPD_OPTS"
+  # List the default -c first, so if the admin has specified -c in
+  # NTPD_OPTS, it is honored.
+  NTPD_OPTS="-c /etc/ntpsec/ntp.conf $NTPD_OPTS"
 fi
 
 NTPD_OPTS="$NTPD_OPTS -u ntpsec:ntpsec"
@@ -47,7 +47,7 @@ LOCKFILE=/run/lock/ntpsec-ntpdate
 inject_pools() {
   SYSTEM_JSON=$(jq -r '.' /boot/config/system.json)
   MODE=$(echo $SYSTEM_JSON | jq -r '.ntp.mode')
-  for server in $(echo "$SYSTEM_JSON" | jq -r '.ntp.servers[]'); do
+  for server in $(echo "$SYSTEM_JSON" | jq -r '.ntp.servers[]') ; do
     echo "pool $server $MODE" >> /etc/ntpsec/ntp.conf
   done
 }
@@ -58,42 +58,42 @@ remove_pools() {
 }
 
 case $1 in
-	start)
-		log_daemon_msg "Starting NTP server" "ntpd"
-		inject_pools
-		# MOS Custom
-		(
-			flock -w 180 9
-			# shellcheck disable=SC2086
-			start-stop-daemon --start --quiet --oknodo --pidfile $PIDFILE --startas $DAEMON -- -p $PIDFILE $NTPD_OPTS >/dev/null 2>&1
-		) 9>$LOCKFILE
-		log_end_msg $?
-		;;
-	stop)
-		log_daemon_msg "Stopping NTP server" "ntpd"
-		start-stop-daemon --stop --quiet --oknodo --pidfile $PIDFILE --retry=TERM/30/KILL/5 --exec $DAEMON
-		log_end_msg $?
-		remove_pools
-		rm -f $PIDFILE
-		;;
-	restart|force-reload)
-		$0 stop && sleep 2 && $0 start
-		;;
-	try-restart)
-		if $0 status >/dev/null; then
-			$0 restart
-		else
-			exit 0
-		fi
-		;;
-	reload)
-		exit 3
-		;;
-	status)
-		status_of_proc $DAEMON "NTP server"
-		;;
-	*)
-		echo "Usage: $0 {start|stop|restart|try-restart|force-reload|status}"
-		exit 2
-		;;
+  start)
+    log_daemon_msg "Starting NTP server" "ntpd"
+    inject_pools
+    # MOS Custom
+    (
+      flock -w 180 9
+      # shellcheck disable=SC2086
+      start-stop-daemon --start --quiet --oknodo --pidfile $PIDFILE --startas $DAEMON -- -p $PIDFILE $NTPD_OPTS >/dev/null 2>&1
+    ) 9>$LOCKFILE
+    log_end_msg $?
+  ;;
+  stop)
+    log_daemon_msg "Stopping NTP server" "ntpd"
+    start-stop-daemon --stop --quiet --oknodo --pidfile $PIDFILE --retry=TERM/30/KILL/5 --exec $DAEMON
+    log_end_msg $?
+    remove_pools
+    rm -f $PIDFILE
+  ;;
+  restart|force-reload)
+    $0 stop && sleep 2 && $0 start
+  ;;
+  try-restart)
+    if $0 status >/dev/null; then
+      $0 restart
+    else
+      exit 0
+    fi
+  ;;
+  reload)
+    exit 3
+  ;;
+  status)
+    status_of_proc $DAEMON "NTP server"
+  ;;
+  *)
+    echo "Usage: $0 {start|stop|restart|try-restart|force-reload|status}"
+    exit 2
+  ;;
 esac
