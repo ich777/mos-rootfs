@@ -43,9 +43,10 @@ check_governor_avail() {
   info="/sys/devices/system/cpu/cpu${1}/cpufreq/scaling_available_governors"
   if [ -f $info ] && grep -q "\<$GOVERNOR\>" $info ; then
     return 0;
-  # Fallback: try to use performance if governor is not found
+  # MOS Custom: Fallback, try to use performance if governor is not found and inject to system.json
   elif [ -f $info ] && grep -q "performance" $info ; then
     GOVERNOR="performance"
+    echo $SYSTEM_JSON | jq '.cpufreq.governor = "performance"' > /tmp/system.temp.json && mv /tmp/system.temp.json /boot/config/system.json >/dev/null 2>&1
     return 0;
   fi
   return 1;
@@ -83,12 +84,13 @@ case "$1" in
         fi
       done
       log_action_end_msg $RETVAL ""
-    ;;
+  ;;
   stop)
-    ;;
+  ;;
   *)
     echo "Usage: $0 {start|stop|restart|reload|force-reload}"
     exit 1
+  ;;
 esac
 
 exit 0
