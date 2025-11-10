@@ -73,22 +73,27 @@ fi
 
 # Loop through ports and add them to docker_cmd
 # Dont add ports when attached to a container as network
-if [[ $network != container:* ]]; then
-port_params=""
-ports_json=$(echo "$config" | jq -c '.ports[]?' 2>/dev/null)
-if [ -n "$ports_json" ]; then
-  for i in $(echo "$config" | jq -r '.ports | keys[]' 2>/dev/null); do
-    host_port=$(echo "$config" | jq -r ".ports[$i].host")
-    container_port=$(echo "$config" | jq -r ".ports[$i].container")
-    protocol=$(echo "$config" | jq -r ".ports[$i].protocol // \"tcp\"")
+case "$network" in
+  container:*)
+    # If it *does* start with container:, skip port mapping
+    ;;
+  *)
+    port_params=""
+    ports_json=$(echo "$config" | jq -c '.ports[]?' 2>/dev/null)
+    if [ -n "$ports_json" ]; then
+      for i in $(echo "$config" | jq -r '.ports | keys[]' 2>/dev/null); do
+        host_port=$(echo "$config" | jq -r ".ports[$i].host")
+        container_port=$(echo "$config" | jq -r ".ports[$i].container")
+        protocol=$(echo "$config" | jq -r ".ports[$i].protocol // \"tcp\"")
 
-    if [ "$host_port" != "null" ] && [ "$container_port" != "null" ]; then
-    port_params="$port_params -p '${host_port}':'${container_port}/${protocol}'"
+        if [ "$host_port" != "null" ] && [ "$container_port" != "null" ]; then
+          port_params="$port_params -p '${host_port}':'${container_port}/${protocol}'"
+        fi
+      done
     fi
-  done
-fi
-docker_cmd="$docker_cmd$port_params"
-fi
+    docker_cmd="$docker_cmd$port_params"
+    ;;
+esac
 
 # Loop through paths and add them to docker_cmd
 volume_params=""
