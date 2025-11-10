@@ -72,7 +72,6 @@ if [ "$cpu_set" != "null" ] && [ "$cpu_set" != "" ]; then
 fi
 
 # Loop through ports and add them to docker_cmd
-# Dont add ports when attached to a container as network
 case "$network" in
   container:*)
     # If it *does* start with container:, skip port mapping
