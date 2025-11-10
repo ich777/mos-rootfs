@@ -1,7 +1,7 @@
 #!/bin/sh
 
 ### BEGIN INIT INFO
-# Provides:	  mos-api
+# Provides:          mos-api
 # Required-Start:    $local_fs $remote_fs $network $syslog $named
 # Required-Stop:     $local_fs $remote_fs $network $syslog $named
 # Default-Start:     2 3 4 5
@@ -26,89 +26,89 @@ PID="/run/mos-api.pid"
 # MOS custom: Pull latest version from mos-api
 # Switch to pm2 at some point
 download_mosapi() {
-    TOKEN="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"
-    if [ "$(ls -A /usr/local/lib/mos-api 2>/dev/null)" ] ; then
-        rm -rf /usr/local/lib/mos-api/* /usr/local/lib/mos-api/.* 2>/dev/null
-    fi
-    if [ ! -d /usr/local/lib/mos-api ] ; then
-      mkdir -p /usr/local/lib/mos-api
-    fi
-    cd /usr/local/lib/mos-api
-    git clone https://oauth2:$TOKEN@github.com/ich777/mos-api.git --depth=1 . >/dev/null 2>&1
-    API_V=$(date -d @"$(git -C /usr/local/lib/mos-api log -1 --format=%ct)" "+%Y%m%d-%H%M")
-    jq --arg api_v "${API_V}_updated" '.mos.api = $api_v' /etc/mos-release.json > /etc/mos-release.json.tmp && mv /etc/mos-release.json.tmp /etc/mos-release.json
+  TOKEN="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"
+  if [ "$(ls -A /usr/local/lib/mos-api 2>/dev/null)" ] ; then
+    rm -rf /usr/local/lib/mos-api/* /usr/local/lib/mos-api/.* 2>/dev/null
+  fi
+  if [ ! -d /usr/local/lib/mos-api ] ; then
+    mkdir -p /usr/local/lib/mos-api
+  fi
+  cd /usr/local/lib/mos-api
+  git clone https://oauth2:$TOKEN@github.com/ich777/mos-api.git --depth=1 . >/dev/null 2>&1
+  API_V=$(date -d @"$(git -C /usr/local/lib/mos-api log -1 --format=%ct)" "+%Y%m%d-%H%M")
+  jq --arg api_v "${API_V}_updated" '.mos.api = $api_v' /etc/mos-release.json > /etc/mos-release.json.tmp && mv /etc/mos-release.json.tmp /etc/mos-release.json
 }
 
 start_mosapi() {
-    start-stop-daemon --start --background --make-pidfile --pidfile $PID --chdir "$DIRECTORY" --user $USER --exec "$DAEMON" -- $ARGS >/dev/null 2>&1
+  start-stop-daemon --start --background --make-pidfile --pidfile $PID --chdir "$DIRECTORY" --user $USER --exec "$DAEMON" -- $ARGS >/dev/null 2>&1
 }
 
 stop_mosapi() {
-    start-stop-daemon --stop --pidfile "$PID"
+  start-stop-daemon --stop --pidfile "$PID"
 }
 
 case "$1" in
-	start)
-		log_daemon_msg "Starting $DESC" "$NAME"
-		start_mosapi
-		case "$?" in
-			0|1) log_end_msg 0 ;;
-			2)   log_end_msg 1 ;;
-		esac
-		;;
-	stop)
-		log_daemon_msg "Stopping $DESC" "$NAME"
-		stop_mosapi
-		case "$?" in
-			0|1) log_end_msg 0 ;;
-			2)   log_end_msg 1 ;;
-		esac
-		;;
-	restart)
-		log_daemon_msg "Restarting $DESC" "$NAME"
+  start)
+    log_daemon_msg "Starting $DESC" "$NAME"
+    start_mosapi
+    case "$?" in
+      0|1) log_end_msg 0 ;;
+      2)   log_end_msg 1 ;;
+    esac
+  ;;
+  stop)
+    log_daemon_msg "Stopping $DESC" "$NAME"
+    stop_mosapi
+    case "$?" in
+      0|1) log_end_msg 0 ;;
+      2)   log_end_msg 1 ;;
+    esac
+  ;;
+  restart)
+    log_daemon_msg "Restarting $DESC" "$NAME"
 
-		stop_mosapi
-		case "$?" in
-			0|1)
-			download_mosapi
-			start_mosapi
-			case "$?" in
-				0) log_end_msg 0 ;;
-				1) log_end_msg 1 ;; # Old process is still running
-				*) log_end_msg 1 ;; # Failed to start
-			esac
-			;;
-			*)
-				# Failed to stop
-				log_end_msg 1
-				;;
-		esac
-		;;
-	update)
-		log_daemon_msg "Updating mos-api" "$NAME"
+    stop_mosapi
+    case "$?" in
+      0|1)
+        download_mosapi
+        start_mosapi
+        case "$?" in
+          0) log_end_msg 0 ;;
+          1) log_end_msg 1 ;; # Old process is still running
+          *) log_end_msg 1 ;; # Failed to start
+        esac
+      ;;
+      *)
+        # Failed to stop
+        log_end_msg 1
+      ;;
+    esac
+  ;;
+  update)
+    log_daemon_msg "Updating mos-api" "$NAME"
 
-		stop_mosapi
-		case "$?" in
-			0|1)
-			download_mosapi
-			start_mosapi
-			case "$?" in
-				0) log_end_msg 0 ;;
-				1) log_end_msg 1 ;; # Old process is still running
-				*) log_end_msg 1 ;; # Failed to start
-			esac
-			;;
-			*)
-				# Failed to stop
-				log_end_msg 1
-				;;
-		esac
-		;;
-	status)
-		status_of_proc -p $PID "$DAEMON" "$NAME" && exit 0 || exit $?
-		;;
-	*)
-		echo "Usage: $NAME {start|stop|restart|update|status}" >&2
-		exit 3
-		;;
+    stop_mosapi
+    case "$?" in
+      0|1)
+        download_mosapi
+        start_mosapi
+        case "$?" in
+          0) log_end_msg 0 ;;
+          1) log_end_msg 1 ;; # Old process is still running
+          *) log_end_msg 1 ;; # Failed to start
+        esac
+      ;;
+      *)
+        # Failed to stop
+        log_end_msg 1
+      ;;
+    esac
+  ;;
+  status)
+    status_of_proc -p $PID "$DAEMON" "$NAME" && exit 0 || exit $?
+  ;;
+  *)
+    echo "Usage: $NAME {start|stop|restart|update|status}" >&2
+    exit 3
+  ;;
 esac
