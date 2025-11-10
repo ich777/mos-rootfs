@@ -29,53 +29,53 @@ test -x $DAEMON || exit 0
 . /lib/lsb/init-functions
 
 generate_shares() {
-    SHARES_JSON="/boot/config/shares.json"
-    SHARES_CONFIG="/etc/samba/mos.conf"
+  SHARES_JSON="/boot/config/shares.json"
+  SHARES_CONFIG="/etc/samba/mos.conf"
 
-    # Check if JSON file exists
-    if [ ! -f "$SHARES_JSON" ]; then
-        return 0
-    fi
+  # Check if JSON file exists
+  if [ ! -f "$SHARES_JSON" ] ; then
+    return 0
+  fi
 
-    # Ensure samba config directory exists
-    mkdir -p "$(dirname "$SHARES_CONFIG")"
-    mkdir -p /var/log/samba
+  # Ensure samba config directory exists
+  mkdir -p "$(dirname "$SHARES_CONFIG")"
+  mkdir -p /var/log/samba
 
-    # Delete old share configurations
-    rm -f "$SHARES_CONFIG"
+  # Delete old share configurations
+  rm -f "$SHARES_CONFIG"
 
-    # Get all SMB share names
-    SHARES=$(jq -r '.[].smb[] | .name' "$SHARES_JSON" 2>/dev/null)
-    if [ $? -eq 0 ]; then
-        IFS=$'\n'
-        for share_name in $SHARES; do
-            # Check if this share is enabled
-            SHARE_ENABLED=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .enabled | if . == null then true else . end" "$SHARES_JSON")
-            if [ "$SHARE_ENABLED" = "true" ]; then
-                # Extract values from JSON with default values for null
-                path="$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .path | select(. != null)" "$SHARES_JSON")"
-                comment=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .comment | if . == null then \"Share $share_name\" else . end" "$SHARES_JSON")
-                guest_ok=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .guest_ok | if . == null then false else . end" "$SHARES_JSON")
-                browseable=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .browseable | if . == null then true else . end" "$SHARES_JSON")
-                read_only=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .read_only | if . == null then true else . end" "$SHARES_JSON")
-                write_list=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .write_list | if . == null then [] else . end | join(\", \")" "$SHARES_JSON")
-                valid_users=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .valid_users | if . == null then [\"@users\"] else . end | join(\", \")" "$SHARES_JSON")
-                force_root=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .force_root | if . == null then false else . end" "$SHARES_JSON")
-                create_mask=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .create_mask | if . == null then \"0664\" else . end" "$SHARES_JSON")
-                directory_mask=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .directory_mask | if . == null then \"0775\" else . end" "$SHARES_JSON")
-                inherit_permissions=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .inherit_permissions | if . == null then false else . end" "$SHARES_JSON")
-                hide_dot_files=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .hide_dot_files | if . == null then true else . end" "$SHARES_JSON")
-                preserve_case=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .preserve_case | if . == null then true else . end" "$SHARES_JSON")
-                case_sensitive=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .case_sensitive | if . == null then false else . end" "$SHARES_JSON")
+  # Get all SMB share names
+  SHARES=$(jq -r '.[].smb[] | .name' "$SHARES_JSON" 2>/dev/null)
+  if [ $? -eq 0 ] ; then
+    IFS=$'\n'
+    for share_name in $SHARES ; do
+      # Check if this share is enabled
+      SHARE_ENABLED=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .enabled | if . == null then true else . end" "$SHARES_JSON")
+      if [ "$SHARE_ENABLED" = "true" ]; then
+        # Extract values from JSON with default values for null
+        path="$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .path | select(. != null)" "$SHARES_JSON")"
+        comment=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .comment | if . == null then \"Share $share_name\" else . end" "$SHARES_JSON")
+        guest_ok=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .guest_ok | if . == null then false else . end" "$SHARES_JSON")
+        browseable=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .browseable | if . == null then true else . end" "$SHARES_JSON")
+        read_only=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .read_only | if . == null then true else . end" "$SHARES_JSON")
+        write_list=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .write_list | if . == null then [] else . end | join(\", \")" "$SHARES_JSON")
+        valid_users=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .valid_users | if . == null then [\"@users\"] else . end | join(\", \")" "$SHARES_JSON")
+        force_root=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .force_root | if . == null then false else . end" "$SHARES_JSON")
+        create_mask=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .create_mask | if . == null then \"0664\" else . end" "$SHARES_JSON")
+        directory_mask=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .directory_mask | if . == null then \"0775\" else . end" "$SHARES_JSON")
+        inherit_permissions=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .inherit_permissions | if . == null then false else . end" "$SHARES_JSON")
+        hide_dot_files=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .hide_dot_files | if . == null then true else . end" "$SHARES_JSON")
+        preserve_case=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .preserve_case | if . == null then true else . end" "$SHARES_JSON")
+        case_sensitive=$(jq -r ".[].smb[] | select(.name == \"$share_name\") | .case_sensitive | if . == null then false else . end" "$SHARES_JSON")
 
-                # Validate required fields
-                if [ -z "$path" ]; then
-                    echo "Path for Share '$share_name' is missing"
-                    continue
-                fi
+        # Validate required fields
+        if [ -z "$path" ] ; then
+          echo "Path for Share '$share_name' is missing"
+          continue
+        fi
 
-                # Append share configuration to the config file
-                cat >> "$SHARES_CONFIG" << EOF
+        # Append share configuration to the config file
+        cat >> "$SHARES_CONFIG" << EOF
 # Automatically generated MountainOS Share-Configuration for $share_name
 [$share_name]
    comment = $comment
@@ -92,58 +92,57 @@ generate_shares() {
    case sensitive = $case_sensitive
 EOF
 
-            # Add inherit permissions if enabled
-            if [ "$inherit_permissions" = "true" ]; then
+        # Add inherit permissions if enabled
+        if [ "$inherit_permissions" = "true" ] ; then
                 cat >> "$SHARES_CONFIG" << EOF
    inherit permissions = yes
 EOF
-            fi
+        fi
 
-            # Add force user/group if force_root is true
-            if [ "$force_root" = "true" ]; then
-                cat >> "$SHARES_CONFIG" << EOF
+        # Add force user/group if force_root is true
+        if [ "$force_root" = "true" ] ; then
+        cat >> "$SHARES_CONFIG" << EOF
    force user = root
    force group = root
 EOF
-
-                fi
-            # Add empty line between shares
-            echo "" >> "$SHARES_CONFIG"
-            fi
-        done
-    fi
-    return 0
+        fi
+        # Add empty line between shares
+        echo "" >> "$SHARES_CONFIG"
+      fi
+    done
+  fi
+  return 0
 }
 
 case "$1" in
-	(start)
-		# Update /etc/apparmor.d/samba/smbd-shares
-		if [ -x /usr/share/samba/update-apparmor-samba-profile ]; then
-			/usr/share/samba/update-apparmor-samba-profile || exit $?
-		fi
-		log_daemon_msg "Starting $DESC" $NAME
-		generate_shares || return 1
-		start-stop-daemon --start --quiet --oknodo --exec $DAEMON --pidfile $PIDFILE -- -D $SMBDOPTIONS
-		log_end_msg $?
-		;;
-	(stop)
-		log_daemon_msg "Stopping $DESC" $NAME
-		start-stop-daemon --stop  --quiet --oknodo --exec $DAEMON --pidfile $PIDFILE
-		log_end_msg $?
-		;;
-	(reload)
-		log_daemon_msg "Reloading $DESC" $NAME
-		start-stop-daemon --stop  --quiet --oknodo --exec $DAEMON --pidfile $PIDFILE --signal HUP
-		log_end_msg $?
-		;;
-	(restart|force-reload)
-		$0 stop && sleep 1 && $0 start
-		;;
-	(status)
-		status_of_proc -p $PIDFILE $DAEMON $NAME
-		;;
-	(*)
-		echo "Usage: /etc/init.d/$SCRIPT {start|stop|reload|restart|force-reload|status}"
-		exit 1
-		;;
+  (start)
+    # Update /etc/apparmor.d/samba/smbd-shares
+    if [ -x /usr/share/samba/update-apparmor-samba-profile ] ; then
+      /usr/share/samba/update-apparmor-samba-profile || exit $?
+    fi
+    log_daemon_msg "Starting $DESC" $NAME
+    generate_shares || return 1
+    start-stop-daemon --start --quiet --oknodo --exec $DAEMON --pidfile $PIDFILE -- -D $SMBDOPTIONS
+    log_end_msg $?
+  ;;
+  (stop)
+    log_daemon_msg "Stopping $DESC" $NAME
+    start-stop-daemon --stop  --quiet --oknodo --exec $DAEMON --pidfile $PIDFILE
+    log_end_msg $?
+  ;;
+  (reload)
+    log_daemon_msg "Reloading $DESC" $NAME
+    start-stop-daemon --stop  --quiet --oknodo --exec $DAEMON --pidfile $PIDFILE --signal HUP
+    log_end_msg $?
+  ;;
+  (restart|force-reload)
+    $0 stop && sleep 1 && $0 start
+  ;;
+  (status)
+    status_of_proc -p $PIDFILE $DAEMON $NAME
+  ;;
+  (*)
+    echo "Usage: /etc/init.d/$SCRIPT {start|stop|reload|restart|force-reload|status}"
+    exit 1
+  ;;
 esac
