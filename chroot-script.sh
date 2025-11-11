@@ -65,6 +65,8 @@ mv /etc/rcS.d/S11resolvconf /etc/rcS.d/S12resolvconf
 mv /etc/rcS.d/S12networking /etc/rcS.d/S11networking
 mv /etc/rc2.d/S04stop-bootlogd /etc/rc2.d/S99stop-bootlogd
 
+mv /etc/smartmontools/run.d/10mail /etc/smartmontools/run.d/10mail.disabled
+
 echo "MOS" > /etc/hostname
 
 mkdir -p /etc/target
