@@ -39,6 +39,11 @@ start_notify() {
   /etc/init.d/notify start
 }
 
+# Start smartmontools
+start_smart() {
+  /etc/init.d/smartmontools start
+}
+
 # Start cron service
 start_cron() {
   /etc/init.d/cron start
@@ -304,6 +309,7 @@ if [ "$1" = "os" ] ; then
     beep -f 500 -l 150 -n -f 580 -l 150
   fi
   start_notify
+  start_smart
   start_script
   modify_issue
   start_ntp
