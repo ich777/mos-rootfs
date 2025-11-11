@@ -23,7 +23,8 @@ PID="/run/mos-notify.pid"
 . /lib/lsb/init-functions
 
 start_notify() {
-  start-stop-daemon --start --background --make-pidfile --pidfile $PID --user $USER --exec "$DAEMON" -- $ARGS >/dev/null 2>&1
+  start-stop-daemon --start --background --make-pidfile --pidfile $PID \
+    --user $USER --exec "$DAEMON" --output /var/log/notify -- $ARGS >/dev/null 2>&1
 }
 
 stop_notify() {
