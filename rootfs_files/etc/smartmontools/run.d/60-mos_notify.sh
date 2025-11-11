@@ -29,4 +29,4 @@ case "$FAILTYPE" in
 esac
 
 # Send notification through MOS notify service
-notify -t "$DEVICE" -m "$MESSAGE" -p "$PRIORITY"
+notify -t "$DEVICE" -m "$MESSAGE" -p "$PRIORITY" >/dev/null 2>&1
