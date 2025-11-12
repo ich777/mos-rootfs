@@ -78,7 +78,7 @@ for remote_name in $REMOTES; do
         SMB_OPTIONS="username=${username},password=${DECRYPTED_PASSWORD},vers=${version},iocharset=utf8,noperm"
         unset DECRYPTED_PASSWORD
       else
-        SMB_OPTIONS="guest,vers=${version}"
+        SMB_OPTIONS="guest,vers=${version},iocharset=utf8,noperm"
       fi
 
       [ "$domain" != "null" ] && \
