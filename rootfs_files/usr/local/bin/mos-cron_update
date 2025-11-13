@@ -53,12 +53,12 @@ DOCKER_UPDATE=$(echo $DOCKER_JSON | jq -r '.update_check.enabled')
 docker_cron=""
 if [ "$DOCKER_UPDATE" != "" ] && [ "$DOCKER_UPDATE" != "null" ] && [ "$DOCKER_UPDATE" == "true" ]; then
   DOCKER_UPDATE_SCHEDULE=$(echo "$DOCKER_JSON" | jq -r '.update_check.update_check_schedule')
-  docker_cron="# MOS Docker Update Check:"'\n'"$DOCKER_UPDATE_SCHEDULE /usr/local/bin/mos-check_for_docker_updates > /dev/null 2>&1"'\n'
+  docker_cron="# MOS Docker Update Check:"'\n'"$DOCKER_UPDATE_SCHEDULE /usr/local/bin/mos-check_for_docker_updates \"\" \"notification\" > /dev/null 2>&1"'\n'
   DOCKER_AUTO_UPDATE=$(echo "$DOCKER_JSON" | jq -r '.update_check.auto_update.enabled')
   if [ "$DOCKER_AUTO_UPDATE" != "null" ] && [ "$DOCKER_AUTO_UPDATE" != "" ] && [ "$DOCKER_AUTO_UPDATE" == "true" ]; then
     DOCKER_AUTO_UPDATE=$(echo "$DOCKER_JSON" | jq -r '.update_check.auto_update.auto_update_schedule')
     DOCKER_AUTO_UPDATE=$(convert_schedule "$DOCKER_AUTO_UPDATE")
-    docker_cron="# MOS Docker Auto Update:"'\n'"$DOCKER_AUTO_UPDATE /usr/local/bin/mos-update_containers > /dev/null 2>&1"'\n'"$docker_cron"
+    docker_cron="# MOS Docker Auto Update:"'\n'"$DOCKER_AUTO_UPDATE /usr/local/bin/mos-update_containers \"\" \"notification\" > /dev/null 2>&1"'\n'"$docker_cron"
   fi
 fi
 crontab="$crontab$docker_cron"
