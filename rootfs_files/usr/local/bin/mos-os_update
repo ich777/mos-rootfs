@@ -45,26 +45,26 @@ rollback_mos() {
 # with a semantic version or if "rollback_mos" is passed over
 case "$1" in
   latest)
-    ;;
+  ;;
   [0-9]*.[0-9]*.[0-9]*)
-    ;;
+  ;;
   rollback)
     rollback_mos
-    ;;
+  ;;
   *)
     echo "Please specify either a valid version latest or rollback"
     exit 1
-    ;;
+  ;;
 esac
 
 # Check if cahnnel is passed over correctly
 case "$2" in
   alpha|beta|stable)
-    ;;
+  ;;
   *)
     echo "Channel can only be: alpha, beta or latest"
     exit 1
-    ;;
+  ;;
 esac
 
 # Call mos-os_get_releases to get available MOS versions
@@ -124,7 +124,7 @@ if [ "$3" = "update_kernel" ] ; then
       --url "https://api.github.com/repos/ich777/mos-kernel/releases?per_page=100" \
       --header "Authorization: Bearer $TOKEN" \
       --header "X-GitHub-Api-Version: 2022-11-28" \
-        -o /var/mos/mos-update/$KERNEL.json
+      --output /var/mos/mos-update/$KERNEL.json
     # Compare if Kernel needs to be upgraded
     if [ "$RUNNING_KERNEL" != $KERNEL ] ; then
       notify -t "MOS Update" -m "Upgrading Kernel to new recommended Kernel: $KERNEL" -p "normal"
