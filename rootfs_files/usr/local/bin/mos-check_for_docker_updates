@@ -3,7 +3,6 @@
 # Check if argument was passed over (check single or all containers)
 if [ -z "$1" ] ; then
   CONTAINER_UPDATES=()
-  notify -t "Docker Update Check" -m "Docker Update Check started in background, you will be notified when the check finished." -p "normal"
   CONTAINERS_JSON=$(cat /var/lib/docker/mos/containers)
   CONTAINER_NAMES=$(echo $CONTAINERS_JSON | jq -r '.[].name')
 else
@@ -41,7 +40,8 @@ do
       :
       ;;
     *)
-      echo "ERROR: Error getting latest digest for container: $container"
+      echo "ERROR: Error getting latest digest for container $container"
+      ERROR=true
       continue
       ;;
   esac
@@ -66,24 +66,34 @@ do
           end
         )
       ' /var/lib/docker/mos/containers > /var/lib/docker/mos/containers.tmp && mv /var/lib/docker/mos/containers.tmp /var/lib/docker/mos/containers
-      logger --tag "mos-docker_update_check" "Update for container $container found"
+      echo "Update for $container found"
     else
-      logger --tag "mos-docker_update_check" "Update pending for container $container"
+      echo "Update for $container pending"
     fi
     CONTAINER_UPDATES+=("$container")
   else
-    echo "Nothing to do for container $container"
+    echo "Nothing to do for $container"
   fi
 done
 
 # Send notify if all container where checked which containers have updates available
-if [ -z "$1" ] ; then
-  if [ ! -z "$CONTAINER_UPDATES" ] ; then
-    MSG_UPDATES=$(IFS=','; echo "${CONTAINER_UPDATES[*]}")
-    MSG_UPDATES=${MSG_UPDATES//,/,\ }
-    notify -t "Docker Update Check" -m "Docker Update Check finished, found updates for containers: $MSG_UPDATES" -p "normal"
-  else
-    notify -t "Docker Update Check" -m "Docker Update Check finished, all containers up to date" -p "normal"
+if [ "$2" = "notification" ] ; then
+  if [ -z "$1" ] ; then
+    if [ ! -z "$CONTAINER_UPDATES" ] ; then
+      MSG_UPDATES=$(IFS=','; echo "${CONTAINER_UPDATES[*]}")
+      MSG_UPDATES=${MSG_UPDATES//,/,\ }
+      if [ "$ERROR" = "true" ] ; then
+        notify -t "Docker Update Check" -m "Docker Update Check finished, found updates for containers: $MSG_UPDATES, but some digests could not be retrieved" -p "normal"
+      else
+        notify -t "Docker Update Check" -m "Docker Update Check finished, found updates for containers: $MSG_UPDATES" -p "normal"
+      fi
+    else
+      if [ "$ERROR" = "true" ] ; then
+        notify -t "Docker Update Check" -m "Docker Update Check finished, all containers checked, but some digests could not be retrieved" -p "normal"
+      else
+        notify -t "Docker Update Check" -m "Docker Update Check finished, all containers up to date" -p "normal"
+      fi
+    fi
   fi
 fi
 
