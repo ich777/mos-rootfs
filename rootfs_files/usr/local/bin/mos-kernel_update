@@ -7,7 +7,7 @@ CURRENT_VERSION=$(uname -r 2>/dev/null)
 TOKEN="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"
 
 # Rollback to previous version
-rollback_mos() {
+rollback_kernel() {
   # Get rollback version
   ROLLBACK_VERSION=$(jq -r '.kernel_version' /boot/rollback/kernel/version.json 2>/dev/null)
 
@@ -31,16 +31,16 @@ rollback_mos() {
 # with a semantic version or if "rollback_mos" is passed over
 case "$1" in
   recommended)
-    ;;
+  ;;
   [0-9]*.[0-9]*.[0-9]*-mos)
-    ;;
+  ;;
   rollback)
-    rollback_mos
-    ;;
+    rollback_kernel
+  ;;
   *)
     echo "Please specify either a valid Kernel version recommended or rollback"
     exit 1
-    ;;
+  ;;
 esac
 
 # Call mos-os_get_releases to get available MOS versions
