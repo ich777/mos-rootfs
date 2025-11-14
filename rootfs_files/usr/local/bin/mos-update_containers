@@ -59,7 +59,6 @@ else
       echo
       echo "Containers updated: $MSG_UPDATES"
     else
-      echo
       echo "Nothing to do, all containers up to date"
     fi
   else
@@ -67,7 +66,6 @@ else
       echo
       echo "Container $1 updated"
     else
-      echo
       echo "Container $1 up to date"
     fi
   fi
