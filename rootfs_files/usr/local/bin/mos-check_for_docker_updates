@@ -83,16 +83,48 @@ if [ "$2" = "notification" ] ; then
       MSG_UPDATES=$(IFS=','; echo "${CONTAINER_UPDATES[*]}")
       MSG_UPDATES=${MSG_UPDATES//,/,\ }
       if [ "$ERROR" = "true" ] ; then
-        notify -t "Docker Update Check" -m "Docker Update Check finished, found updates for containers: $MSG_UPDATES, but some digests could not be retrieved" -p "normal"
+        notify -t "Docker Update Check" -m "Updates for following containers available: $MSG_UPDATES, some digests could not be retrieved" -p "warning"
       else
-        notify -t "Docker Update Check" -m "Docker Update Check finished, found updates for containers: $MSG_UPDATES" -p "normal"
+        notify -t "Docker Update Check" -m "Updates for following containers available: $MSG_UPDATES" -p "normal"
       fi
     else
       if [ "$ERROR" = "true" ] ; then
-        notify -t "Docker Update Check" -m "Docker Update Check finished, all containers checked, but some digests could not be retrieved" -p "normal"
+        notify -t "Docker Update Check" -m "All containers checked, no updates found, some digests could not be retrieved" -p "warning"
       else
-        notify -t "Docker Update Check" -m "Docker Update Check finished, all containers up to date" -p "normal"
+        notify -t "Docker Update Check" -m "All containers up to date" -p "normal"
       fi
+    fi
+  fi
+else
+  if [ -z "$1" ] ; then
+    if [ ! -z "$CONTAINER_UPDATES" ] ; then
+      MSG_UPDATES=$(IFS=','; echo "${CONTAINER_UPDATES[*]}")
+      MSG_UPDATES=${MSG_UPDATES//,/,\ }
+      if [ "$ERROR" = "true" ] ; then
+        echo
+        echo "Updates for following containers available: $MSG_UPDATES"
+        echo "WARNING: Some digests could not be retrieved"
+      else
+        echo
+        echo "Updates for following containers available: $MSG_UPDATES"
+      fi
+    else
+      if [ "$ERROR" = "true" ] ; then
+        echo
+        echo "All containers checked, no updates found"
+        echo "WARNING: Some digests could not be retrieved"
+      else
+        echo
+        echo "All containers up to date"
+      fi
+    fi
+  else
+    if [ "$ERROR" = "true" ] ; then
+      echo
+      echo "ERROR: digests for container $1 could not be retrieved"
+    else
+      echo
+      echo "Container $1 up to date"
     fi
   fi
 fi
