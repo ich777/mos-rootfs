@@ -110,20 +110,16 @@ else
       fi
     else
       if [ "$ERROR" = "true" ] ; then
-        echo
         echo "All containers checked, no updates found"
         echo "WARNING: Some digests could not be retrieved"
       else
-        echo
         echo "All containers up to date"
       fi
     fi
   else
     if [ "$ERROR" = "true" ] ; then
-      echo
       echo "ERROR: digests for container $1 could not be retrieved"
     else
-      echo
       echo "Container $1 up to date"
     fi
   fi
