@@ -45,9 +45,9 @@ stop_mos() {
 
   shutdown_script
 
-  if [ -f /var/run/ntpd.pid ] ; then
-    /etc/init.d/ntpsec stop
-  fi
+#  if [ -f /var/run/ntpd.pid ] ; then
+#    /etc/init.d/ntpsec stop
+#  fi
   if [ -f /var/run/sshd.pid ] ; then
     /etc/init.d/ssh stop
   fi
