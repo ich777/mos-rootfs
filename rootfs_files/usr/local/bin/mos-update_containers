@@ -46,7 +46,7 @@ if [ "$2" = "notification" ] ; then
     if [ ! -z "$CONTAINER_UPDATES" ] ; then
       MSG_UPDATES=$(IFS=','; echo "${CONTAINER_UPDATES[*]}")
       MSG_UPDATES=${MSG_UPDATES//,/,\ }
-      notify -t "Docker Updates" -m "Docker Updates finished, following containers where updated: $MSG_UPDATES" -p "normal"
+      notify -t "Docker Updates" -m "Docker Containers updated: $MSG_UPDATES" -p "normal"
     else
       notify -t "Docker Updates" -m "Nothing to do, all containers up to date" -p "normal"
     fi
@@ -57,7 +57,7 @@ else
       MSG_UPDATES=$(IFS=','; echo "${CONTAINER_UPDATES[*]}")
       MSG_UPDATES=${MSG_UPDATES//,/,\ }
       echo
-      echo "Docker Updates finished, following containers where updated: $MSG_UPDATES"
+      echo "Containers updated: $MSG_UPDATES"
     else
       echo
       echo "Nothing to do, all containers up to date"
