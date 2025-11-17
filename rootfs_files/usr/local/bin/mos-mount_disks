@@ -301,7 +301,7 @@ do
       if [ "$EXIT_STATUS" != "0" ] ; then
         umount /mnt/$POOL >/dev/null 2>&1
         rmdir /mnt/$POOL
-        echo "nocheck PAUSE" > /proc/nmdcmd
+        echo "nocheck CANCEL" > /proc/nmdcmd
         echo "stop" > /proc/nmdcmd
         continue 2
       fi
