@@ -195,7 +195,7 @@ do
       EXIT_STATUS=$?
       if [ "$EXIT_STATUS" != "0" ] ; then
         umount /mnt/$POOL >/dev/null 2>&1
-        rmdir /mnt/$POOL
+        rmdir /mnt/$POOL >/dev/null 2>&1
         continue 2
       fi
       if [ -z "$MOUNTS" ] ; then
@@ -302,9 +302,15 @@ do
       EXIT_STATUS=$?
       if [ "$EXIT_STATUS" != "0" ] ; then
         umount /mnt/$POOL >/dev/null 2>&1
-        rmdir /mnt/$POOL
-        echo "nocheck CANCEL" > /proc/nmdcmd
-        echo "stop" > /proc/nmdcmd
+        rmdir /mnt/$POOL >/dev/null 2>&1
+        for disk in /var/mergerfs/$POOL/*
+        do
+          umount "$disk" >/dev/null 2>&1
+          rmdir "$disk" >/dev/null 2>&1
+        done
+        rmdir /var/mergerfs/$POOL
+        { echo "nocheck CANCEL" > /proc/nmdcmd; } 2>/dev/null
+        { echo "stop" > /proc/nmdcmd; } 2>/dev/null
         continue 2
       fi
       if [ -z "$MOUNTS" ] ; then
