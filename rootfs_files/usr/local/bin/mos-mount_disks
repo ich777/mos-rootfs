@@ -9,6 +9,14 @@ else
   POOLS="$1"
 fi
 
+# Check unclean shutdown
+if [ -f /boot/config/system/mos.chk ] ; then
+  UNCLEAN_SHUTDOWN=true
+else
+  UNCLEAN_SHUTDOWN=false
+  echo "Please don't remove this files" > /boot/config/system/mos.chk
+fi
+
 # Create pool directory and mergerfs mount when pool is mergerfs
 create_pool_directory() {
   if [ "$(mount | grep "/mnt/$1")" ] ; then
@@ -320,6 +328,11 @@ do
       fi
     done
     mergerfs_mount_pool "$MOUNTS" "$POOL" "$CREATE_POLICY"
+    # Add control file if not exists or start parity check
+    if [ "$UNCLEAN_SHUTDOWN" == "true" ] ; then
+      { echo "check" > /proc/nmdcmd; } 2>/dev/null
+      notify -t "MOS System" -m "Unclean shutdown detected! Parity check for $POOL started" -p "alert"
+    fi
     PATH_RULE_COUNT=$(echo $POOL_JSON | jq -r '.config.path_rules | length')
     if [ "$PATH_RULE_COUNT" != "0" ] ; then
       for path in $(echo $POOL_JSON | jq -r '.config.path_rules[].path')
