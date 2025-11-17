@@ -236,10 +236,13 @@ do
       continue
     lsmod | grep -qE "md.nonraid" && \
       continue
-    
+
+    # Create pool directory and exit early if directory is already found
+    create_pool_directory "$POOL" "mergerfs" || { echo "Pool $POOL already mounted" ; continue ; }
+
     # Load nonraid module with nonraid.dat path
     modprobe md-nonraid super=/boot/config/system/nonraid.dat
-    
+
     # Wait to make sure everything is loaded correctly
     sleep 1
 
@@ -287,7 +290,6 @@ do
       continue
     fi
 
-    create_pool_directory "$POOL" "mergerfs" || { echo "Pool $POOL already mounted" ; continue ; }
     CREATE_POLICY=$(echo $POOL_JSON | jq -r '.config.policies.create')
     for data_slot in $(echo $POOL_JSON | jq -r '.data_devices[].slot')
     do
