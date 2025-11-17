@@ -34,20 +34,25 @@ mergerfs_create_disk_directory() {
 # Mount individual mergerfs disk and check for keys if it's a LUKS pool
 mergerfs_mount_disk() {
   if [ ! "$(findmnt /var/mergerfs/$3/disk$4)" ]; then
+    if [ "$7" == "nonraid" ] ; then
+      DEVICE_PATH="/dev/nmd${4}p1"
+    else
+      DEVICE_PATH="/dev/disk/by-uuid/$2"
+    fi
     if [ "$5" == "true" ] ; then
       if [ ! -z "$6" ] ; then
         echo "${6//\"/\\\"}" | cryptsetup open /dev/disk/by-uuid/$2 ${3}_${4}
       elif [ -f /tmp/luks/$3.key ] ; then
-        cryptsetup open /dev/disk/by-uuid/$2 ${3}_${4} --key-file /tmp/luks/$3.key
+        cryptsetup open $DEVICE_PATH ${3}_${4} --key-file /tmp/luks/$3.key
       elif [ -f /boot/config/system/luks/$3.key ] ; then
-        cryptsetup open /dev/disk/by-uuid/$2 ${3}_${4} --key-file /boot/config/system/luks/$3.key
+        cryptsetup open $DEVICE_PATH ${3}_${4} --key-file /boot/config/system/luks/$3.key
       else
         logger "Can't mount encrypted disk$4 from pool: $3 without passphrase or keyfile"
         return 1
       fi
       mount -t $1 /dev/mapper/${3}_${4} /var/mergerfs/$3/disk$4
     else
-      mount -t $1 /dev/disk/by-uuid/$2 /var/mergerfs/$3/disk$4
+      mount -t $1 $DEVICE_PATH /var/mergerfs/$3/disk$4
     fi
   fi
 }
@@ -212,6 +217,101 @@ do
         snapraid_mount_disk "$PARITY_FS" "$PARITY_ID" "$POOL" "$parity_slot" "$POOL_ENCRYPTED" "$DECRYPTION_KEY"
       done
     fi
+    PATH_RULE_COUNT=$(echo $POOL_JSON | jq -r '.config.path_rules | length')
+    if [ "$PATH_RULE_COUNT" != "0" ] ; then
+      for path in $(echo $POOL_JSON | jq -r '.config.path_rules[].path')
+      do
+        RULE_TARGETS=$(echo "$POOL_JSON" | jq -r --arg path "$path" '.config.path_rules[] | select(.path == $path) | .target_devices[]')
+        if [ "$RULE_TARGETS" != "0" ] ; then
+          for target_device in $RULE_TARGETS
+          do
+            mergerfs_create_paths "$POOL" "${path#/}" "$target_device"
+          done
+        fi
+      done
+    fi
+  elif [ "$POOL_TYPE" == "nonraid" ] ; then
+    # Make sure module is available and activated
+    ! modinfo md-nonraid >/dev/null 2>&1 && \
+      continue
+    lsmod | grep -qE "md.nonraid" && \
+      continue
+    
+    # Load nonraid module with nonraid.dat path
+    modprobe md-nonraid super=/boot/config/system/nonraid.dat
+    
+    # Wait to make sure everything is loaded correctly
+    sleep 1
+
+    # Get stats
+    NONRAID_STAT=$(cat /proc/nmdstat)
+
+    # Loop through parity disks
+    for parity in 0 29
+    do
+      # Skip unassigned disks
+      UUID=$(grep "diskId\.$parity=" <<< "$NONRAID_STAT" | cut -d '=' -f2)
+      [ -z "$UUID" ] && \
+        continue
+      UUID=$(grep "diskId\.$parity=" <<< "$NONRAID_STAT" | cut -d '=' -f2)
+      DEV_PATH=$(readlink -f /dev/disk/by-uuid/$UUID | sed 's|^/dev/||')
+      SIZE=$(( $(blockdev --getsz /dev/disk/by-uuid/$UUID) / 2 ))
+      # MOS Missing: Check against pools.json if disk is actually present
+      echo "import $parity $DEV_PATH 0 $SIZE 0 $UUID" > /proc/nmdcmd
+    done
+
+    # Loop through data disks
+    for disk in {1..28}
+    do
+      # Skip unassigned disks
+      UUID=$(grep "diskId\.$disk=" <<< "$NONRAID_STAT" | cut -d '=' -f2)
+      [ -z "$UUID" ] && \
+        continue
+      UUID=$(grep "diskId\.$disk=" <<< "$NONRAID_STAT" | cut -d '=' -f2)
+      DEV_PATH=$(readlink -f /dev/disk/by-uuid/$UUID | sed 's|^/dev/||')
+      SIZE=$(( $(blockdev --getsz /dev/disk/by-uuid/$UUID) / 2 ))
+      # MOS Missing: Check against pools.json if disk is actually present
+      echo "import $disk $DEV_PATH 0 $SIZE 0 $UUID" > /proc/nmdcmd
+    done
+
+    # Try to start nonraid
+    NONRAID_STATUS=$(cat /proc/nmdstat | grep "mdState=" | cut -d '=' -f2)
+    if [ "$NONRAID_STATUS" = "STOPPED" ] ; then
+      echo "start" > /proc/nmdcmd
+      EXIT_STATUS=$?
+      if [ "$EXIT_STATUS" != "0" ] ; then
+        continue
+      fi
+    else
+      logger "Can't mount nonraid disks, nonraid status: $NONRAID_STATUS"
+      continue
+    fi
+
+    create_pool_directory "$POOL" "mergerfs" || { echo "Pool $POOL already mounted" ; continue ; }
+    CREATE_POLICY=$(echo $POOL_JSON | jq -r '.config.policies.create')
+    for data_slot in $(echo $POOL_JSON | jq -r '.data_devices[].slot')
+    do
+      mergerfs_create_disk_directory "$POOL" "$data_slot"
+      DISK_DETAILS=$(echo "$POOL_JSON" | jq -r --arg data_slot "$data_slot" '.data_devices[] | select(.slot == $data_slot)')
+      DISK_ID=$(echo "$DISK_DETAILS" | jq -r '.id')
+      DISK_FS=$(echo "$DISK_DETAILS" | jq -r '.filesystem')
+      logger "Mounting$ENCRYPTED_TEXT mergerfs disk${DISK_ID} from: $POOL"
+      mergerfs_mount_disk "$DISK_FS" "$DISK_ID" "$POOL" "$data_slot" "$POOL_ENCRYPTED" "$DECRYPTION_KEY" "nonraid"
+      EXIT_STATUS=$?
+      if [ "$EXIT_STATUS" != "0" ] ; then
+        umount /mnt/$POOL >/dev/null 2>&1
+        rmdir /mnt/$POOL
+        echo "nocheck PAUSE" > /proc/nmdcmd
+        echo "stop" > /proc/nmdcmd
+        continue 2
+      fi
+      if [ -z "$MOUNTS" ] ; then
+        MOUNTS="/var/mergerfs/$POOL/disk$data_slot"
+      else
+        MOUNTS="$MOUNTS:/var/mergerfs/$POOL/disk$data_slot"
+      fi
+    done
+    mergerfs_mount_pool "$MOUNTS" "$POOL" "$CREATE_POLICY"
     PATH_RULE_COUNT=$(echo $POOL_JSON | jq -r '.config.path_rules | length')
     if [ "$PATH_RULE_COUNT" != "0" ] ; then
       for path in $(echo $POOL_JSON | jq -r '.config.path_rules[].path')
