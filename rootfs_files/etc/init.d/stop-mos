@@ -18,6 +18,7 @@ RUN_DIR="/run"
 . /lib/lsb/init-functions
 
 LXC_JSON=$(jq '.' /boot/config/lxc.json)
+POOLS_JSON=$(jq '.' /boot/config/pools.json)
 
 shutdown_script() {
   if [ -f /boot/optional/scripts/shutdown.sh ] ; then
@@ -97,6 +98,20 @@ stop_mos() {
   fi
   if [ -f /var/run/mos-api.pid ] ; then
     /etc/init.d/api stop
+  fi
+  if echo $POOLS_JSON | jq -r '.[] | select(.type == "nonraid")' >/dev/null 2>&1 ; then
+    POOL=$(echo $POOLS_JSON | jq -r '.[] | select(.type == "nonraid") | .name')
+    umount /mnt/$POOL >/dev/null 2>&1
+    rmdir /mnt/$POOL >/dev/null 2>&1
+    for disk in /var/mergerfs/$POOL/*
+    do
+      umount "$disk" >/dev/null 2>&1
+      rmdir "$disk" >/dev/null 2>&1
+    done
+    rmdir /var/mergerfs/$POOL
+    { echo "nocheck CANCEL" > /proc/nmdcmd; } 2>/dev/null
+    { echo "stop" > /proc/nmdcmd; } 2>/dev/null
+    rm -f /boot/config/system/nonraid.chk
   fi
 }
 
