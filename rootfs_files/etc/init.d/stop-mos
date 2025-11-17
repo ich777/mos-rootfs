@@ -111,8 +111,8 @@ stop_mos() {
     rmdir /var/mergerfs/$POOL
     { echo "nocheck CANCEL" > /proc/nmdcmd; } 2>/dev/null
     { echo "stop" > /proc/nmdcmd; } 2>/dev/null
-    rm -f /boot/config/system/nonraid.chk
   fi
+  rm -f /boot/config/system/mos.chk
 }
 
 case "$1" in
