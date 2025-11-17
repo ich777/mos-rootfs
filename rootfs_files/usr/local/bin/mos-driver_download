@@ -29,6 +29,13 @@ fi
 # GH Token
 TOKEN="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"
 
+# Set Title
+if [ "$1" = "update" ] ; then
+  NOTIFY_TITLE="MOS Update"
+else
+  NOTIFY_TITLE="MOS Drivers"
+fi
+
 # Call mos-os_get_releases to get available MOS versions
 if ! /usr/local/bin/mos-drivers_get_releases "$UNAME" ; then
   exit 1
@@ -56,10 +63,8 @@ fi
 
 # Download function with md5 check
 download_asset() {
-  echo "Downloading: ${3}"
-  if [ -z "$4" ] ; then
-    notify -t "MOS Update" -m "Downloading driver: ${3}" -p "normal"
-  fi
+  echo "Downloading: ${3}${4}"
+  notify -t "$NOTIFY_TITLE" -m "Downloading driver: ${3}${4}" -p "normal"
   curl --progress-bar -L \
     --header "Authorization: Bearer $TOKEN" \
     --header "Accept: application/octet-stream" \
@@ -70,11 +75,11 @@ download_asset() {
   if [ "$4" = ".md5" ] ; then
     if [ "$(md5sum /boot/optional/drivers/$1/$UNAME/$3 | awk '{print $1}')" != "$(cat /boot/optional/drivers/$1/$UNAME/${3}${4} | awk '{print $1}')" ] ; then
       echo "$3 checksom ERROR"
-      notify -t "MOS Update" -m "Checksum error for driver: ${3}" -p "warning"
+      notify -t "$NOTIFY_TITLE" -m "Checksum error for driver: ${3}${4}" -p "warning"
       return 1
     else
       echo "$3 checksum OK"
-      notify -t "MOS Update" -m "Driver download: ${3} successful" -p "normal"
+      notify -t "$NOTIFY_TITLE" -m "Driver download: ${3}${4} successful" -p "normal"
     fi
   fi
 }
