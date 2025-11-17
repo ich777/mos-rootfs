@@ -5,16 +5,15 @@ PATH=$PATH:/usr/local/bin
 POOLS_JSON=$(jq '.[]' /boot/config/pools.json)
 if [ -z "$1" ]; then
   POOLS=$(echo "$POOLS_JSON" | jq '.name')
+  # Check for unclean shutdown
+  if [ -f /boot/config/system/mos.chk ] ; then
+    UNCLEAN_SHUTDOWN=true
+  else
+    UNCLEAN_SHUTDOWN=false
+    echo "Please don't remove this files" > /boot/config/system/mos.chk
+  fi
 else
   POOLS="$1"
-fi
-
-# Check unclean shutdown
-if [ -f /boot/config/system/mos.chk ] ; then
-  UNCLEAN_SHUTDOWN=true
-else
-  UNCLEAN_SHUTDOWN=false
-  echo "Please don't remove this files" > /boot/config/system/mos.chk
 fi
 
 # Create pool directory and mergerfs mount when pool is mergerfs
@@ -261,14 +260,13 @@ do
     for parity in 0 29
     do
       # Skip unassigned disks
-      UUID=$(grep "diskId\.$parity=" <<< "$NONRAID_STAT" | cut -d '=' -f2)
-      [ -z "$UUID" ] && \
+      ID=$(grep "diskId\.$parity=" <<< "$NONRAID_STAT" | cut -d '=' -f2)
+      [ -z "$ID" ] && \
         continue
-      UUID=$(grep "diskId\.$parity=" <<< "$NONRAID_STAT" | cut -d '=' -f2)
-      DEV_PATH=$(readlink -f /dev/disk/by-uuid/$UUID | sed 's|^/dev/||')
-      SIZE=$(( $(blockdev --getsz /dev/disk/by-uuid/$UUID) / 2 ))
+      DEV_PATH=$(readlink -f /dev/disk/by-id/$ID | sed 's|^/dev/||')
+      SIZE=$(( $(blockdev --getsz /dev/disk/by-id/$ID) / 2 ))
       # MOS Missing: Check against pools.json if disk is actually present
-      echo "import $parity $DEV_PATH 0 $SIZE 0 $UUID" > /proc/nmdcmd
+      echo "import $parity $DEV_PATH 0 $SIZE 0 $ID" > /proc/nmdcmd
     done
 
     # Loop through data disks
@@ -278,7 +276,6 @@ do
       UUID=$(grep "diskId\.$disk=" <<< "$NONRAID_STAT" | cut -d '=' -f2)
       [ -z "$UUID" ] && \
         continue
-      UUID=$(grep "diskId\.$disk=" <<< "$NONRAID_STAT" | cut -d '=' -f2)
       DEV_PATH=$(readlink -f /dev/disk/by-uuid/$UUID | sed 's|^/dev/||')
       SIZE=$(( $(blockdev --getsz /dev/disk/by-uuid/$UUID) / 2 ))
       # MOS Missing: Check against pools.json if disk is actually present
