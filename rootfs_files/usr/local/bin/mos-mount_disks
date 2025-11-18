@@ -40,9 +40,11 @@ mergerfs_create_disk_directory() {
 
 # Mount individual mergerfs disk and check for keys if it's a LUKS pool
 mergerfs_mount_disk() {
+   MOUNT_OPTIONS="-o discard"
   if [ ! "$(findmnt /var/mergerfs/$3/disk$4)" ]; then
     if [ "$7" == "nonraid" ] ; then
       DEVICE_PATH="/dev/nmd${4}p1"
+      MOUNT_OPTIONS="-o nodiscard"
     else
       DEVICE_PATH="/dev/disk/by-uuid/$2"
     fi
@@ -57,9 +59,9 @@ mergerfs_mount_disk() {
         logger "Can't mount encrypted disk$4 from pool: $3 without passphrase or keyfile"
         return 1
       fi
-      mount -t $1 /dev/mapper/${3}_${4} /var/mergerfs/$3/disk$4
+      mount -t $1 $MOUNT_OPTIONS /dev/mapper/${3}_${4} /var/mergerfs/$3/disk$4
     else
-      mount -t $1 $DEVICE_PATH /var/mergerfs/$3/disk$4
+      mount -t $1 $MOUNT_OPTIONS $DEVICE_PATH /var/mergerfs/$3/disk$4
     fi
   fi
 }
@@ -85,6 +87,7 @@ snapraid_create_parity_directory() {
 
 # Mount individual SnapRAID disk and check for keys if it's a LUKS pool
 snapraid_mount_disk() {
+  MOUNT_OPTIONS="-o discard"
   if [ ! "$(findmnt /var/snapraid/$3/parity$4)" ]; then
     if [ "$5" == "true" ] ; then
       if [ ! -z "$6" ] ; then
@@ -97,9 +100,9 @@ snapraid_mount_disk() {
         logger "Can't mount encrypted parity$4 from pool: $3 without passphrase or keyfile"
         return 1
       fi
-      mount -t $1 /dev/mapper/parity_${3}_${4} /var/snapraid/$3/parity$4
+      mount -t $1 $MOUNT_OPTIONS /dev/mapper/parity_${3}_${4} /var/snapraid/$3/parity$4
     else
-      mount -t $1 /dev/disk/by-uuid/$2 /var/snapraid/$3/parity$4
+      mount -t $1 $MOUNT_OPTIONS /dev/disk/by-uuid/$2 /var/snapraid/$3/parity$4
     fi
   fi
 }
@@ -120,15 +123,17 @@ btrfs_luks_open() {
 
 # Mount BTRFS Pool
 btrfs_mount_pool() {
+  MOUNT_OPTIONS="-o discard"
   if [ "$3" == "true" ] ; then
-    mount ${1}/${2}_1 /mnt/$2
+    mount -t btrfs $MOUNT_OPTIONS ${1}/${2}_1 /mnt/$2
   else
-    mount /dev/disk/by-uuid/$1 /mnt/$2
+    mount -t btrfs $MOUNT_OPTIONS /dev/disk/by-uuid/$1 /mnt/$2
   fi
 }
 
 # Mount ext4 disk and check if it's a LUKS encrypted
 ext4_mount_disk() {
+  MOUNT_OPTIONS="-o discard"
   if [ "$3" == "true" ] ; then
     if [ ! -z "$4" ] ; then
       echo "${4//\"/\\\"}" | cryptsetup open /dev/disk/by-uuid/$1 ${2}_1
@@ -140,14 +145,15 @@ ext4_mount_disk() {
       logger "Can't mount encrypted pool $2 without passphrase or keyfile"
       return 1
     fi
-    mount -t ext4 /dev/mapper/${2}_1 /mnt/$2
+    mount -t ext4 $MOUNT_OPTIONS /dev/mapper/${2}_1 /mnt/$2
   else
-    mount -t ext4 /dev/disk/by-uuid/$1 /mnt/$2
+    mount -t ext4 $MOUNT_OPTIONS /dev/disk/by-uuid/$1 /mnt/$2
   fi
 }
 
 # Mount xfs disk and check if it's a LUKS encrypted
 xfs_mount_disk() {
+  MOUNT_OPTIONS="-o discard"
   if [ "$3" == "true" ] ; then
     if [ ! -z "$4" ] ; then
       echo "${4//\"/\\\"}" | cryptsetup open /dev/disk/by-uuid/$1 ${2}_1
@@ -159,9 +165,9 @@ xfs_mount_disk() {
       logger "Can't mount encrypted pool $2 without passphrase or keyfile"
       return 1
     fi
-    mount -t xfs /dev/mapper/${2}_1 /mnt/$2
+    mount -t xfs $MOUNT_OPTIONS /dev/mapper/${2}_1 /mnt/$2
   else
-    mount -t xfs /dev/disk/by-uuid/$1 /mnt/$2
+    mount -t xfs $MOUNT_OPTIONS /dev/disk/by-uuid/$1 /mnt/$2
   fi
 }
 
