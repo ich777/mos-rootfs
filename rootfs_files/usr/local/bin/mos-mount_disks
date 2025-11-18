@@ -8,6 +8,7 @@ if [ -z "$1" ]; then
   # Check for unclean shutdown
   if [ -f /boot/config/system/mos.chk ] ; then
     UNCLEAN_SHUTDOWN=true
+    notify -t "MOS" -m "Unclean shutdown detected!" -p "alert"
   else
     UNCLEAN_SHUTDOWN=false
     echo "Please don't remove this files" > /boot/config/system/mos.chk
@@ -230,6 +231,16 @@ do
         snapraid_mount_disk "$PARITY_FS" "$PARITY_ID" "$POOL" "$parity_slot" "$POOL_ENCRYPTED" "$DECRYPTION_KEY"
       done
     fi
+    # Start SnapRAID check if enabled
+    if [ "$UNCLEAN_SHUTDOWN" == "true" ] ; then
+      UNCLEAN_CHECK=$(echo $POOL_JSON | jq -r '.config.unclean_check')
+      if [ "$UNCLEAN_CHECK" == "true" ] && [ "$PARITY_COUNT" != "0" ] ; then
+        mos-snapraid $POOL check >/dev/null 2>&1
+        notify -t "SnapRAID" -m "Ceck for $POOL started" -p "alert"
+      else
+        notify -t "SnapRAID" -m "Check for $POOL on unclean shutdown is disabled" -p "alert"
+      fi
+    fi
     PATH_RULE_COUNT=$(echo $POOL_JSON | jq -r '.config.path_rules | length')
     if [ "$PATH_RULE_COUNT" != "0" ] ; then
       for path in $(echo $POOL_JSON | jq -r '.config.path_rules[].path')
@@ -263,12 +274,14 @@ do
     NONRAID_STAT=$(cat /proc/nmdstat)
 
     # Loop through parity disks
+    PARITY_COUNT=0
     for parity in 0 29
     do
       # Skip unassigned disks
       ID=$(grep "diskId\.$parity=" <<< "$NONRAID_STAT" | cut -d '=' -f2)
       [ -z "$ID" ] && \
         continue
+      ((PARITY_COUNT++))
       DEV_PATH=$(readlink -f /dev/disk/by-id/$ID | sed 's|^/dev/||')
       SIZE=$(( $(blockdev --getsz /dev/disk/by-id/$ID) / 2 ))
       # MOS Missing: Check against pools.json if disk is actually present
@@ -331,10 +344,15 @@ do
       fi
     done
     mergerfs_mount_pool "$MOUNTS" "$POOL" "$CREATE_POLICY"
-    # Add control file if not exists or start parity check
+    # Start parity check if enabled
     if [ "$UNCLEAN_SHUTDOWN" == "true" ] ; then
-      { echo "check" > /proc/nmdcmd; } 2>/dev/null
-      notify -t "MOS System" -m "Unclean shutdown detected! Parity check for $POOL started" -p "alert"
+      UNCLEAN_CHECK=$(echo $POOL_JSON | jq -r '.config.unclean_check')
+      if [ "$UNCLEAN_CHECK" == "true" ] && [ "$PARITY_COUNT" != "0" ] ; then
+        { echo "check" > /proc/nmdcmd; } 2>/dev/null
+        notify -t "nonraid" -m "Parity check for $POOL started" -p "alert"
+      else
+        notify -t "nonraid" -m "Parity check for $POOL on unclean shutdown is disabled" -p "alert"
+      fi
     fi
     PATH_RULE_COUNT=$(echo $POOL_JSON | jq -r '.config.path_rules | length')
     if [ "$PATH_RULE_COUNT" != "0" ] ; then
@@ -370,6 +388,17 @@ do
     else
       btrfs_mount_pool "$DISK_ID" "$POOL" "false"
     fi
+    # Start scrub if enabled on unclean shutdown
+    if [ "$UNCLEAN_SHUTDOWN" == "true" ] ; then
+      UNCLEAN_CHECK=$(echo $POOL_JSON | jq -r '.config.unclean_check')
+      POOL_DEVICES=$(echo "$POOL_JSON" | jq -r '.data_devices | length')
+      if [ "$UNCLEAN_CHECK" == "true" ] && [ "$POOL_DEVICES" -gt "1" ] ; then
+        btrfs scrub start /mnt/$POOL >/dev/null 2>&1
+        notify -t "BTRFS" -m "Scrub for $POOL started" -p "alert"
+      else
+        notify -t "BTRFS" -m "Scrub for $POOL on unclean shutdown is disabled" -p "alert"
+      fi
+    fi
   elif [ "$POOL_TYPE" == "ext4" ] ; then
     create_pool_directory "$POOL" "$POOL_TYPE" || { echo "Pool $POOL already mounted" ; continue ; }
     logger "Mounting$ENCRYPTED_TEXT ext4 disk: $POOL"
@@ -394,7 +423,7 @@ do
     fi
   fi
   mount_script "$POOL"
-  unset POOL_JSON DISK_COUNT DISK_NO MOUNTS PARITY_COUNT POOL_ENCRYPTED ENCRYPTED_TEXT KEY EXIT_STATUS
+  unset POOL_JSON DISK_COUNT DISK_NO MOUNTS PARITY_COUNT POOL_ENCRYPTED ENCRYPTED_TEXT KEY EXIT_STATUS UNCLEAN_CHECK POOL_DEVICES
 done
 
 # Make sure to remove temporary LUKS files
