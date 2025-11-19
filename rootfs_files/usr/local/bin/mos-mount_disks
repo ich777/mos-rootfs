@@ -234,11 +234,13 @@ do
     # Start SnapRAID check if enabled
     if [ "$UNCLEAN_SHUTDOWN" == "true" ] ; then
       UNCLEAN_CHECK=$(echo $POOL_JSON | jq -r '.config.unclean_check')
-      if [ "$UNCLEAN_CHECK" == "true" ] && [ "$PARITY_COUNT" != "0" ] ; then
-        mos-snapraid $POOL check >/dev/null 2>&1
-        notify -t "SnapRAID" -m "Ceck for $POOL started" -p "alert"
-      else
-        notify -t "SnapRAID" -m "Check for $POOL on unclean shutdown is disabled" -p "alert"
+      if [ "$PARITY_COUNT" != "0" ] ; then
+        if [ "$UNCLEAN_CHECK" == "true" ] ; then
+          mos-snapraid $POOL check >/dev/null 2>&1
+          notify -t "SnapRAID" -m "Ceck for $POOL started" -p "alert"
+        else
+          notify -t "SnapRAID" -m "Check for $POOL on unclean shutdown is disabled" -p "alert"
+        fi
       fi
     fi
     PATH_RULE_COUNT=$(echo $POOL_JSON | jq -r '.config.path_rules | length')
@@ -347,11 +349,13 @@ do
     # Start parity check if enabled
     if [ "$UNCLEAN_SHUTDOWN" == "true" ] ; then
       UNCLEAN_CHECK=$(echo $POOL_JSON | jq -r '.config.unclean_check')
-      if [ "$UNCLEAN_CHECK" == "true" ] && [ "$PARITY_COUNT" != "0" ] ; then
-        { echo "check" > /proc/nmdcmd; } 2>/dev/null
-        notify -t "nonraid" -m "Parity check for $POOL started" -p "alert"
-      else
-        notify -t "nonraid" -m "Parity check for $POOL on unclean shutdown is disabled" -p "alert"
+      if [ "$PARITY_COUNT" != "0" ] ; then
+        if [ "$UNCLEAN_CHECK" == "true" ] ; then
+          { echo "check" > /proc/nmdcmd; } 2>/dev/null
+          notify -t "nonraid" -m "Parity check for $POOL started" -p "alert"
+        else
+          notify -t "nonraid" -m "Parity check for $POOL on unclean shutdown is disabled" -p "alert"
+        fi
       fi
     fi
     PATH_RULE_COUNT=$(echo $POOL_JSON | jq -r '.config.path_rules | length')
@@ -392,11 +396,13 @@ do
     if [ "$UNCLEAN_SHUTDOWN" == "true" ] ; then
       UNCLEAN_CHECK=$(echo $POOL_JSON | jq -r '.config.unclean_check')
       POOL_DEVICES=$(echo "$POOL_JSON" | jq -r '.data_devices | length')
-      if [ "$UNCLEAN_CHECK" == "true" ] && [ "$POOL_DEVICES" -gt "1" ] ; then
-        btrfs scrub start /mnt/$POOL >/dev/null 2>&1
-        notify -t "BTRFS" -m "Scrub for $POOL started" -p "alert"
-      else
-        notify -t "BTRFS" -m "Scrub for $POOL on unclean shutdown is disabled" -p "alert"
+      if [ "$POOL_DEVICES" -gt "1" ] ; then
+        if [ "$UNCLEAN_CHECK" == "true" ] ; then
+          btrfs scrub start /mnt/$POOL >/dev/null 2>&1
+          notify -t "BTRFS" -m "Scrub for $POOL started" -p "alert"
+        else
+          notify -t "BTRFS" -m "Scrub for $POOL on unclean shutdown is disabled" -p "alert"
+        fi
       fi
     fi
   elif [ "$POOL_TYPE" == "ext4" ] ; then
