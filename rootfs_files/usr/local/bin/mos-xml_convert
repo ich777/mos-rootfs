@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Check passed over argument and if it's an URL or a file
 if [ -z "$1" ] ; then
   echo "ERROR: No argument provided, use either a filename or an URL"
@@ -25,26 +25,38 @@ fi
 # Get Docker appdata location
 DOCKER_APPDATA=$(jq -r '.appdata' /boot/config/docker.json)
 
-# Extract keys
-NAME=$(awk -F'[<>]' '/<Name>/ {print $3; exit}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
-REPO=$(awk -F'[<>]' '/<Repository>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
-REGISTRY=$(awk -F'[<>]' '/<Registry>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
-NETWORK=$(awk -F'[<>]' '/<Network>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
-CUSTOM_IP=$(awk -F'[<>]' '/<MyIP>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
-DEFAULT_SHELL=$(awk -F'[<>]' '/<Shell>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
-PRIVILEGED=$(awk -F'[<>]' '/<Privileged>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
-EXTRA_PARAMETERS=$(awk -F'[<>]' '/<ExtraParams>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
-POST_PARAMETERS=$(awk -F'[<>]' '/<PostArgs>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
-CPU_SET=$(awk -F'[<>]' '/<CPUset>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
-WEB_UI_URL=$(awk -F'[<>]' '/<WebUI>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
-ICON=$(awk -F'[<>]' '/<Icon>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
-CATEGORY=$(awk -F'[<>]' '/<Category>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
-PROJECT=$(awk -F'[<>]' '/<Project>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
-SUPPORT=$(awk -F'[<>]' '/<Support>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
-OVERVIEW=$(awk -F'[<>]' '/<Overview>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
-DONATE=$(awk -F'[<>]' '/<DonateLink>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
-REQUIRES=$(awk -F'[<>]' '/<Requires>/ {print $3}' $FILE | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g')
-CONFIGS=$(awk -F'[<>]' '/<Config/ {print $2 " Value=\"" $3"\""}' $FILE)
+# Helper function to extract XML element content using xmllint
+xml_get() {
+  local xpath="$1"
+  xmllint --xpath "string($xpath)" "$FILE" 2>/dev/null || true
+}
+
+# Helper function to get attribute from XML element
+xml_get_attr() {
+  local xpath="$1"
+  local attr="$2"
+  xmllint --xpath "string($xpath/@$attr)" "$FILE" 2>/dev/null || true
+}
+
+# Extract keys using xmllint
+NAME=$(xml_get "//Name")
+REPO=$(xml_get "//Repository")
+REGISTRY=$(xml_get "//Registry")
+NETWORK=$(xml_get "//Network")
+CUSTOM_IP=$(xml_get "//MyIP")
+DEFAULT_SHELL=$(xml_get "//Shell")
+PRIVILEGED=$(xml_get "//Privileged")
+EXTRA_PARAMETERS=$(xml_get "//ExtraParams")
+POST_PARAMETERS=$(xml_get "//PostArgs")
+CPU_SET=$(xml_get "//CPUset")
+WEB_UI_URL=$(xml_get "//WebUI")
+ICON=$(xml_get "//Icon")
+CATEGORY=$(xml_get "//Category")
+PROJECT=$(xml_get "//Project")
+SUPPORT=$(xml_get "//Support")
+OVERVIEW=$(xml_get "//Overview")
+DONATE=$(xml_get "//DonateLink")
+REQUIRES=$(xml_get "//Requires")
 
 # Construct JSON from extracted keys
 base_json=$(jq -n \
@@ -86,11 +98,29 @@ base_json=$(jq -n \
     labels: []
   }')
 
-# Function for extracting attributes
+# Function for extracting attributes using xmllint
 extract_attr() {
-  xml="$1"
-  attr="$2"
-  echo "$xml" | grep -o "${attr}=\"[^\"]*\"" | cut -d'"' -f2 | sed 's/&[^;]*;//g' | sed 's/[\x00-\x1F]//g'
+  local config_index="$1"
+  local attr="$2"
+  xmllint --xpath "string(//Config[$config_index]/@$attr)" "$FILE" 2>/dev/null || true
+}
+
+# Function to safely extract and parse value
+extract_value() {
+  local config_index="$1"
+  local text_content
+  local value_attr
+  
+  # First try to get text content between tags (for nested JSON)
+  text_content=$(xmllint --xpath "string(//Config[$config_index]/text())" "$FILE" 2>/dev/null || true)
+  
+  # Fallback to Value attribute if text content is empty
+  if [ -z "$text_content" ]; then
+    value_attr=$(xmllint --xpath "string(//Config[$config_index]/@Value)" "$FILE" 2>/dev/null || true)
+    echo "$value_attr"
+  else
+    echo "$text_content"
+  fi
 }
 
 # Create temp paths
@@ -100,19 +130,22 @@ temp_vars=$(mktemp)
 temp_devices=$(mktemp)
 temp_labels=$(mktemp)
 
-# Loop through configs from XML
-echo "$CONFIGS" | while IFS= read -r config; do
-  [ -z "$config" ] && continue
+# Get total number of Config elements
+config_count=$(xmllint --xpath "count(//Config)" "$FILE" 2>/dev/null || echo "0")
+
+# Loop through configs using index-based approach
+for ((i=1; i<=config_count; i++)); do
+  config_type=$(xmllint --xpath "string(//Config[$i]/@Type)" "$FILE" 2>/dev/null || true)
   
-  case "$config" in
-    *Type=\"Path\"*)
+  case "$config_type" in
+    Path)
       jq -n \
-        --arg name "$(extract_attr "$config" "Name")" \
-        --arg host "$(extract_attr "$config" "Value")" \
-        --arg container "$(extract_attr "$config" "Target")" \
-        --arg mode "$(extract_attr "$config" "Mode")" \
-        --arg description "$(extract_attr "$config" "Description")" \
-        --arg required "$(extract_attr "$config" "Required")" \
+        --arg name "$(extract_attr "$i" "Name")" \
+        --arg host "$(extract_attr "$i" "Value")" \
+        --arg container "$(extract_attr "$i" "Target")" \
+        --arg mode "$(extract_attr "$i" "Mode")" \
+        --arg description "$(extract_attr "$i" "Description")" \
+        --arg required "$(extract_attr "$i" "Required")" \
         --arg appdata "$DOCKER_APPDATA" \
         '{
           name: (if $name != "" then $name else null end),
@@ -132,17 +165,17 @@ echo "$CONFIGS" | while IFS= read -r config; do
           description: (if $description != "" then $description else null end),
           required: (if $required != "" then ($required | test("true|yes|1"; "i")) else null end)
         }' >> "$temp_paths"
-      ;;
-    *Type=\"Port\"*)
+    ;;
+    Port)
       jq -n \
-        --arg name "$(extract_attr "$config" "Name")" \
-        --arg host "$(extract_attr "$config" "Value")" \
-        --arg container "$(extract_attr "$config" "Target")" \
-        --arg default "$(extract_attr "$config" "Default")" \
-        --arg protocol "$(extract_attr "$config" "Mode")" \
-        --arg description "$(extract_attr "$config" "Description")" \
-        --arg required "$(extract_attr "$config" "Required")" \
-        --arg mask "$(extract_attr "$config" "Mask")" \
+        --arg name "$(extract_attr "$i" "Name")" \
+        --arg host "$(extract_attr "$i" "Value")" \
+        --arg container "$(extract_attr "$i" "Target")" \
+        --arg default "$(extract_attr "$i" "Default")" \
+        --arg protocol "$(extract_attr "$i" "Mode")" \
+        --arg description "$(extract_attr "$i" "Description")" \
+        --arg required "$(extract_attr "$i" "Required")" \
+        --arg mask "$(extract_attr "$i" "Mask")" \
         '{
           name: (if $name != "" then $name else null end),
           host: (if $host != "" then $host elif $default != "" then $default else null end),
@@ -152,16 +185,17 @@ echo "$CONFIGS" | while IFS= read -r config; do
           required: (if $required != "" then ($required | test("true|yes|1"; "i")) else null end),
           mask: (if $mask != "" then ($mask | test("true|yes|1"; "i")) else null end)
         }' >> "$temp_ports"
-      ;;
-    *Type=\"Variable\"*)
+    ;;
+    Variable)
+      value=$(extract_value "$i")
       jq -n \
-        --arg name "$(extract_attr "$config" "Name")" \
-        --arg key "$(extract_attr "$config" "Target")" \
-        --arg value "$(extract_attr "$config" "Value")" \
-        --arg default "$(extract_attr "$config" "Default")" \
-        --arg description "$(extract_attr "$config" "Description")" \
-        --arg required "$(extract_attr "$config" "Required")" \
-        --arg mask "$(extract_attr "$config" "Mask")" \
+        --arg name "$(extract_attr "$i" "Name")" \
+        --arg key "$(extract_attr "$i" "Target")" \
+        --arg value "$value" \
+        --arg default "$(extract_attr "$i" "Default")" \
+        --arg description "$(extract_attr "$i" "Description")" \
+        --arg required "$(extract_attr "$i" "Required")" \
+        --arg mask "$(extract_attr "$i" "Mask")" \
         '{
           name: (if $name != "" then $name else null end),
           key: (if $key != "" then $key else null end),
@@ -175,14 +209,14 @@ echo "$CONFIGS" | while IFS= read -r config; do
           required: (if $required != "" then ($required | test("true|yes|1"; "i")) else null end),
           mask: (if $mask != "" then ($mask | test("true|yes|1"; "i")) else null end)
         }' >> "$temp_vars"
-      ;;
-    *Type=\"Device\"*)
+    ;;
+    Device)
       jq -n \
-        --arg name "$(extract_attr "$config" "Name")" \
-        --arg host "$(extract_attr "$config" "Value")" \
-        --arg container "$(extract_attr "$config" "Target")" \
-        --arg description "$(extract_attr "$config" "Description")" \
-        --arg required "$(extract_attr "$config" "Required")" \
+        --arg name "$(extract_attr "$i" "Name")" \
+        --arg host "$(extract_attr "$i" "Value")" \
+        --arg container "$(extract_attr "$i" "Target")" \
+        --arg description "$(extract_attr "$i" "Description")" \
+        --arg required "$(extract_attr "$i" "Required")" \
         '{
           name: (if $name != "" then $name else null end),
           host: (if $host != "" then $host else null end),
@@ -190,15 +224,15 @@ echo "$CONFIGS" | while IFS= read -r config; do
           description: (if $description != "" then $description else null end),
           required: (if $required != "" then ($required | test("true|yes|1"; "i")) else null end)
         }' >> "$temp_devices"
-      ;;
-    *Type=\"Label\"*)
+    ;;
+    Label)
       jq -n \
-        --arg name "$(extract_attr "$config" "Name")" \
-        --arg key "$(extract_attr "$config" "Target")" \
-        --arg value "$(extract_attr "$config" "Value")" \
-        --arg description "$(extract_attr "$config" "Description")" \
-        --arg required "$(extract_attr "$config" "Required")" \
-        --arg mask "$(extract_attr "$config" "Mask")" \
+        --arg name "$(extract_attr "$i" "Name")" \
+        --arg key "$(extract_attr "$i" "Target")" \
+        --arg value "$(extract_attr "$i" "Value")" \
+        --arg description "$(extract_attr "$i" "Description")" \
+        --arg required "$(extract_attr "$i" "Required")" \
+        --arg mask "$(extract_attr "$i" "Mask")" \
         '{
           name: (if $name != "" then $name else null end),
           key: (if $key != "" then $key else null end),
@@ -207,7 +241,7 @@ echo "$CONFIGS" | while IFS= read -r config; do
           required: (if $required != "" then ($required | test("true|yes|1"; "i")) else null end),
           mask: (if $mask != "" then ($mask | test("true|yes|1"; "i")) else null end)
         }' >> "$temp_labels"
-      ;;
+    ;;
   esac
 done
 
