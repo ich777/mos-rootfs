@@ -45,6 +45,19 @@ if [ "$POOLS_MERGERFS" != "" ] && [ "$POOLS_MERGERFS" != "null" ]; then
 fi
 crontab="$crontab$pools_cron"
 
+# Scan for nonraid Schedules and add them to cron list
+ID_NONRAID=$(echo $POOLS_JSON | jq -r '.[] | select(.type == "nonraid") | .id')
+nonraid_cron=""
+if [ "$ID_NONRAID" != "" ] && [ "$ID_NONRAID" != "null" ]; then
+  CHECK_ENABLED=$(echo "$POOLS_JSON" | jq -r ".[] | select(.id == \"$ID_NONRAID\") | .config.check.enabled")
+  if [ "$CHECK_ENABLED" != "" ] && [ "$CHECK_ENABLED" != "null" ] && [ "$CHECK_ENABLED" == "true" ]; then
+    POOL_NAME=$(echo "$POOLS_JSON" | jq -r ".[] | select(.id == \"$ID_NONRAID\") | .name")
+    CHECK_SCHEDULE=$(echo "$POOLS_JSON" | jq -r ".[] | select(.id == \"$ID_NONRAID\") | .config.check.schedule")
+    nonraid_cron="# MOS $POOL_NAME Parity Check:"'\n'"$CHECK_SCHEDULE echo \"check\" > /proc/nmdcmd 2>/dev/null"'\n'
+  fi
+fi
+crontab="$crontab$nonraid_cron"
+
 # Read docker.json
 DOCKER_JSON=$(jq -r '.' /boot/config/docker.json 2>/dev/null)
 DOCKER_UPDATE=$(echo $DOCKER_JSON | jq -r '.update_check.enabled')
