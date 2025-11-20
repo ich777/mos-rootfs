@@ -286,8 +286,12 @@ do
       ((PARITY_COUNT++))
       DEV_PATH=$(readlink -f /dev/disk/by-id/$ID | sed 's|^/dev/||')
       SIZE=$(( $(blockdev --getsz /dev/disk/by-id/$ID) / 2 ))
-      # MOS Missing: Check against pools.json if disk is actually present
-      echo "import $parity $DEV_PATH 0 $SIZE 0 $ID" > /proc/nmdcmd
+      # If parity is found then import it otherwise mount it as missing
+      if [ -e "/dev/disk/by-id/$ID" ] ; then
+        echo "import $parity $DEV_PATH 0 $SIZE 0 $ID" > /proc/nmdcmd
+      else
+        echo "import $disk '' 0 0 0 ''" > /proc/nmdcmd
+      fi
     done
 
     # Loop through data disks
@@ -299,8 +303,12 @@ do
         continue
       DEV_PATH=$(readlink -f /dev/disk/by-uuid/$UUID | sed 's|^/dev/||')
       SIZE=$(( $(blockdev --getsz /dev/disk/by-uuid/$UUID) / 2 ))
-      # MOS Missing: Check against pools.json if disk is actually present
-      echo "import $disk $DEV_PATH 0 $SIZE 0 $UUID" > /proc/nmdcmd
+      # If disk is found then import it otherwise mount it as missing
+      if [ -e "/dev/disk/by-uuid/$UUID" ] ; then
+        echo "import $disk $DEV_PATH 0 $SIZE 0 $UUID" > /proc/nmdcmd
+      else
+        echo "import $disk '' 0 0 0 ''" > /proc/nmdcmd
+      fi
     done
 
     # Try to start nonraid
@@ -346,18 +354,6 @@ do
       fi
     done
     mergerfs_mount_pool "$MOUNTS" "$POOL" "$CREATE_POLICY"
-    # Start parity check if enabled
-    if [ "$UNCLEAN_SHUTDOWN" == "true" ] ; then
-      UNCLEAN_CHECK=$(echo $POOL_JSON | jq -r '.config.unclean_check')
-      if [ "$PARITY_COUNT" != "0" ] ; then
-        if [ "$UNCLEAN_CHECK" == "true" ] ; then
-          { echo "check" > /proc/nmdcmd; } 2>/dev/null
-          notify -t "nonraid" -m "Parity check for $POOL started" -p "alert"
-        else
-          notify -t "nonraid" -m "Parity check for $POOL on unclean shutdown is disabled" -p "alert"
-        fi
-      fi
-    fi
     PATH_RULE_COUNT=$(echo $POOL_JSON | jq -r '.config.path_rules | length')
     if [ "$PATH_RULE_COUNT" != "0" ] ; then
       for path in $(echo $POOL_JSON | jq -r '.config.path_rules[].path')
@@ -370,6 +366,27 @@ do
           done
         fi
       done
+    fi
+    # Start parity check if enabled
+    if [ "$UNCLEAN_SHUTDOWN" == "true" ] ; then
+      UNCLEAN_CHECK=$(echo $POOL_JSON | jq -r '.config.unclean_check')
+      if [ "$PARITY_COUNT" != "0" ] ; then
+        if [ "$UNCLEAN_CHECK" == "true" ] ; then
+          { echo "check" > /proc/nmdcmd; } 2>/dev/null
+          notify -t "nonraid" -m "Parity check for $POOL started" -p "alert"
+        else
+          notify -t "nonraid" -m "Parity check for $POOL on unclean shutdown is disabled" -p "alert"
+        fi
+      fi
+    fi
+    # Set md write mode
+    MD_WRITEMODE=$(echo $POOL_JSON | jq -r '.config.md_writemode // "normal"')
+    if [ "$MD_WRITEMODE" == "normal" ] ; then
+      echo "set md_write_method 0" > /proc/nmdcmd
+    elif [ "$MD_WRITEMODE" == "turbo" ] ; then
+      echo "set md_write_method 1" > /proc/nmdcmd
+    else
+      echo "set md_write_method 0" > /proc/nmdcmd
     fi
   elif [ "$POOL_TYPE" == "btrfs" ] ; then
     create_pool_directory "$POOL" "$POOL_TYPE" || { echo "Pool $POOL already mounted" ; continue ; }
