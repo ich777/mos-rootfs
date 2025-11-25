@@ -243,7 +243,7 @@ docker_cmd+=("$repo")
 # Add post parameters to docker_cmd
 if [[ "$post_parameters" != "null" && -n "$post_parameters" ]]; then
   # Split post_parameters properly - assuming they are space-separated
-  read -ra post_params_array <<< "$post_parameters"
+  readarray -t post_params_array < <(xargs -n1 <<< "$post_parameters")
   docker_cmd+=("${post_params_array[@]}")
 fi
 
