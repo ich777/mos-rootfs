@@ -54,7 +54,7 @@ ICON=$(xml_get "//Icon")
 CATEGORY=$(xml_get "//Category")
 PROJECT=$(xml_get "//Project")
 SUPPORT=$(xml_get "//Support")
-OVERVIEW=$(xml_get "//Overview")
+DESCRIPTION=$(xml_get "//Overview")
 DONATE=$(xml_get "//DonateLink")
 REQUIRES=$(xml_get "//Requires")
 
@@ -74,7 +74,7 @@ base_json=$(jq -n \
   --arg icon "$ICON" \
   --arg project "$PROJECT" \
   --arg support "$SUPPORT" \
-  --arg overview "$OVERVIEW" \
+  --arg description "$DESCRIPTION" \
   '{
     name: (if $name != "" then $name else null end),
     repo: (if $repo != "" then $repo else null end),
@@ -90,7 +90,7 @@ base_json=$(jq -n \
     icon: (if $icon != "" then $icon else null end),
     project: (if $project != "" then $project else null end),
     support: (if $support != "" then $support else null end),
-    overview: (if $overview != "" then $overview else null end),
+    description: (if $description != "" then $description else null end),
     paths: [],
     ports: [],
     variables: [],
