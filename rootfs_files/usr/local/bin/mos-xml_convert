@@ -48,7 +48,6 @@ DEFAULT_SHELL=$(xml_get "//Shell")
 PRIVILEGED=$(xml_get "//Privileged")
 EXTRA_PARAMETERS=$(xml_get "//ExtraParams")
 POST_PARAMETERS=$(xml_get "//PostArgs")
-CPU_SET=$(xml_get "//CPUset")
 WEB_UI_URL=$(xml_get "//WebUI")
 ICON=$(xml_get "//Icon")
 CATEGORY=$(xml_get "//Category")
@@ -69,7 +68,6 @@ base_json=$(jq -n \
   --arg privileged "$PRIVILEGED" \
   --arg extra_parameters "$EXTRA_PARAMETERS" \
   --arg post_parameters "$POST_PARAMETERS" \
-  --arg cpu_set "$CPU_SET" \
   --arg web_ui_url "$WEB_UI_URL" \
   --arg icon "$ICON" \
   --arg project "$PROJECT" \
@@ -85,7 +83,6 @@ base_json=$(jq -n \
     privileged: (if $privileged != "" then ($privileged | test("true|yes|1"; "i")) else null end),
     extra_parameters: (if $extra_parameters != "" then $extra_parameters else null end),
     post_parameters: (if $post_parameters != "" then $post_parameters else null end),
-    cpu_set: (if $cpu_set != "" then $cpu_set else null end),
     web_ui_url: (if $web_ui_url != "" then $web_ui_url else null end),
     icon: (if $icon != "" then $icon else null end),
     project: (if $project != "" then $project else null end),
