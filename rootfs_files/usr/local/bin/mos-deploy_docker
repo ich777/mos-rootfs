@@ -179,6 +179,7 @@ if [[ -n "$gpus_json" ]]; then
         docker_cmd+=(--device "${gpu_card}:${gpu_card}" --device "${gpu_render}:${gpu_render}")
       fi
     else
+      notify -t "Docker" -m "GPU with PCI ID: $1 for container $name not found, please check your configuration" -p "warning"
       echo "WARNING: GPU with PCI ID: $i not found, skipping"
     fi
   done < <(echo "$config" | jq -r '.gpus[]' 2>/dev/null)
