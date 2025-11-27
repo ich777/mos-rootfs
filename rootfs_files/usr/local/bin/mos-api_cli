@@ -1,0 +1,110 @@
+#!/usr/bin/env node
+/**
+ * MOS API CLI - Direct service access for cron jobs and automation
+ * Usage: mos-api_cli <command> [options]
+ *
+ * This bypasses HTTP/Auth by calling services directly.
+ * Only works when run locally on the same machine.
+ */
+
+const path = require('path');
+const fs = require('fs');
+
+// API root directory
+const API_ROOT = '/usr/local/lib/mos-api';
+
+// Add node_modules to module search path
+module.paths.unshift(path.join(API_ROOT, 'node_modules'));
+
+// Load environment from file
+const ENV_PATH = '/boot/config/api/env';
+try {
+  const envContent = fs.readFileSync(ENV_PATH, 'utf8');
+  envContent.split('\n').forEach(line => {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const [key, ...valueParts] = trimmed.split('=');
+      if (key && valueParts.length) {
+        process.env[key.trim()] = valueParts.join('=').trim();
+      }
+    }
+  });
+} catch (e) {
+  // ENV file optional, continue without it
+}
+
+// Services - lazy loaded to avoid errors
+const getService = (name) => require(path.join(API_ROOT, 'src', 'services', `${name}.service`));
+
+// Create object from class
+const getPoolsService = () => {
+  const PoolsService = getService('pools');
+  return new PoolsService();
+};
+
+const commands = {
+  // EXAMPLES
+
+  // Hub
+  'hub:update': {
+    description: 'Update all configured repositories',
+    handler: async () => await getService('hub').updateRepositories()
+  },
+
+
+  // System
+  'system:info': {
+    description: 'Get system information/load',
+    handler: async () => await getService('system').getSystemLoad()
+  },
+
+  // Pools
+  'pools:list': {
+    description: 'Get all pool statuses',
+    handler: async () => await getPoolsService().listPools()
+  },
+
+  // Disks
+  'disks:list': {
+    description: 'List all disks',
+    handler: async () => await getService('disks').getAllDisks()
+  },
+
+  // Help
+  'help': {
+    description: 'Show this help message',
+    handler: async () => {
+      console.log('MOS API CLI - Available commands:\n');
+      Object.entries(commands).forEach(([cmd, info]) => {
+        console.log(`  ${cmd.padEnd(20)} ${info.description}`);
+      });
+      console.log('\nUsage: mos-api_cli <command>');
+      return null;
+    }
+  }
+};
+
+async function main() {
+  const command = process.argv[2];
+
+  if (!command || !commands[command]) {
+    if (command && command !== 'help') {
+      console.error(`Unknown command: ${command}`);
+    }
+    await commands.help.handler();
+    process.exit(command ? 1 : 0);
+  }
+
+  try {
+    const result = await commands[command].handler();
+    if (result !== null) {
+      console.log(JSON.stringify(result, null, 2));
+    }
+    process.exit(0);
+  } catch (error) {
+    console.error(`${error.message}\n`);
+    process.exit(1);
+  }
+}
+
+main();
