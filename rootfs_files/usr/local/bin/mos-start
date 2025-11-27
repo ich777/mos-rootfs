@@ -1,10 +1,11 @@
 #!/bin/sh
 # Put all JSONs into Variables
-SYSTEM_JSON=$(jq '.' /boot/config/system.json)
-DOCKER_JSON=$(jq '.' /boot/config/docker.json)
-LXC_JSON=$(jq '.' /boot/config/lxc.json)
-VM_JSON=$(jq '.' /boot/config/vm.json)
-NETWORK_JSON=$(jq '.' /boot/config/network.json)
+SYSTEM_JSON=$(jq '.' /boot/config/system.json 2>/dev/null)
+DOCKER_JSON=$(jq '.' /boot/config/docker.json 2>/dev/null)
+LXC_JSON=$(jq '.' /boot/config/lxc.json 2>/dev/null)
+VM_JSON=$(jq '.' /boot/config/vm.json 2>/dev/null)
+NETWORK_JSON=$(jq '.' /boot/config/network.json 2>/dev/null)
+HUB_JSON=$(jq '.' /boot/config/system/hub.json 2>/dev/null)
 
 # Execute echo to get one emty line
 echo
@@ -280,7 +281,7 @@ modify_issue() {
     ipv4=$(ip -4 addr show "$iface" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
     ipv6=$(ip -6 addr show "$iface" 2>/dev/null | grep -oP '(?<=inet6\s)[0-9a-f:]+(?=/64)' | grep -v '^fe80' | head -1)
     if [ ! -z "$ipv4" ] || [ ! -z "$ipv6" ]; then
-      echo "" >> /etc/issue  # Eine Leerzeile
+      echo "" >> /etc/issue
       [ ! -z "$ipv4" ] && echo "  IPv4: $ipv4" >> /etc/issue
       [ ! -z "$ipv6" ] && echo "  IPv6: $ipv6" >> /etc/issue
       break
@@ -299,6 +300,15 @@ persist_history() {
     rm -f /root/.bash_history
     touch /boot/config/system/.bash_history
     ln -s /boot/config/system/.bash_history /root/.bash_history
+  fi
+}
+
+# 
+mos_hub_update() {
+  HUB_ENALBED=$(echo $HUB_JSON | jq -r '.enabled')
+  HUB_INITIAL_ENABLED=$(echo $HUB_JSON | jq -r '.initial_update')
+  if [ "$HUB_ENALBED" = "true" ] && [ "$HUB_INITIAL_ENABLED" = "true" ] ; then
+    node /usr/local/bin/mos-api_cli hub:update >/dev/null 2>&1 &
   fi
 }
 
@@ -332,6 +342,7 @@ if [ "$1" = "os" ] ; then
   start_vm
   start_nginx
   start_api
+  mos_hub_update
   mos_spindown
   start_cron
   end_script
