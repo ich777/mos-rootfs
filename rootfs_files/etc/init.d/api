@@ -40,7 +40,8 @@ download_mosapi() {
 }
 
 start_mosapi() {
-  start-stop-daemon --start --background --make-pidfile --pidfile $PID --chdir "$DIRECTORY" --user $USER --exec "$DAEMON" -- $ARGS >/dev/null 2>&1
+  start-stop-daemon --start --background --make-pidfile --pidfile $PID \
+    --chdir "$DIRECTORY" --user $USER --exec "$DAEMON" --output /var/log/api -- $ARGS >/dev/null 2>&1
 }
 
 stop_mosapi() {
