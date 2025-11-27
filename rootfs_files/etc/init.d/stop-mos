@@ -1,4 +1,4 @@
-#!/bin/sh -e
+#!/bin/sh
 # MOS custom
 
 ### BEGIN INIT INFO
@@ -99,7 +99,7 @@ stop_mos() {
   if [ -f /var/run/mos-api.pid ] ; then
     /etc/init.d/api stop
   fi
-  if echo $POOLS_JSON | jq -r '.[] | select(.type == "nonraid")' >/dev/null 2>&1 ; then
+  if [ ! -z "$(echo $POOLS_JSON | jq -r '.[] | select(.type == "nonraid") // ""')" ] ; then
     POOL=$(echo $POOLS_JSON | jq -r '.[] | select(.type == "nonraid") | .name')
     umount /mnt/$POOL >/dev/null 2>&1
     rmdir /mnt/$POOL >/dev/null 2>&1
@@ -108,11 +108,12 @@ stop_mos() {
       umount "$disk" >/dev/null 2>&1
       rmdir "$disk" >/dev/null 2>&1
     done
-    rmdir /var/mergerfs/$POOL
+    rmdir /var/mergerfs/$POOL >/dev/null 2>&1
     { echo "nocheck CANCEL" > /proc/nmdcmd; } 2>/dev/null
     { echo "stop" > /proc/nmdcmd; } 2>/dev/null
   fi
   rm -f /boot/config/system/mos.chk
+  sync
 }
 
 case "$1" in
