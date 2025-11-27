@@ -138,7 +138,7 @@ for ((i=1; i<=config_count; i++)); do
     Path)
       jq -n \
         --arg name "$(extract_attr "$i" "Name")" \
-        --arg host "$(extract_attr "$i" "Value")" \
+        --arg host "$(extract_value "$i")" \
         --arg container "$(extract_attr "$i" "Target")" \
         --arg mode "$(extract_attr "$i" "Mode")" \
         --arg description "$(extract_attr "$i" "Description")" \
@@ -166,7 +166,7 @@ for ((i=1; i<=config_count; i++)); do
     Port)
       jq -n \
         --arg name "$(extract_attr "$i" "Name")" \
-        --arg host "$(extract_attr "$i" "Value")" \
+        --arg host "$(extract_value "$i")" \
         --arg container "$(extract_attr "$i" "Target")" \
         --arg default "$(extract_attr "$i" "Default")" \
         --arg protocol "$(extract_attr "$i" "Mode")" \
@@ -210,7 +210,7 @@ for ((i=1; i<=config_count; i++)); do
     Device)
       jq -n \
         --arg name "$(extract_attr "$i" "Name")" \
-        --arg host "$(extract_attr "$i" "Value")" \
+        --arg host "$(extract_value "$i")" \
         --arg container "$(extract_attr "$i" "Target")" \
         --arg description "$(extract_attr "$i" "Description")" \
         --arg required "$(extract_attr "$i" "Required")" \
@@ -226,7 +226,7 @@ for ((i=1; i<=config_count; i++)); do
       jq -n \
         --arg name "$(extract_attr "$i" "Name")" \
         --arg key "$(extract_attr "$i" "Target")" \
-        --arg value "$(extract_attr "$i" "Value")" \
+        --arg value "$(extract_value "$i")" \
         --arg description "$(extract_attr "$i" "Description")" \
         --arg required "$(extract_attr "$i" "Required")" \
         --arg mask "$(extract_attr "$i" "Mask")" \
