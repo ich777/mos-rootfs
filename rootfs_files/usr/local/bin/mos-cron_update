@@ -76,6 +76,20 @@ if [ "$DOCKER_UPDATE" != "" ] && [ "$DOCKER_UPDATE" != "null" ] && [ "$DOCKER_UP
 fi
 crontab="$crontab$docker_cron"
 
+# Read hub.json
+HUB_JSON=$(jq -r '.' /boot/config/system/hub.json 2>/dev/null)
+HUB_ENABLED=$(echo $HUB_JSON | jq -r '.enabled')
+
+# Scan for docker Schedules and add them to cron list
+hub_cron=""
+if [ "$HUB_ENABLED" != "" ] && [ "$HUB_ENABLED" != "null" ] && [ "$HUB_ENABLED" == "true" ]; then
+  HUB_UPDATE_SCHEDULE=$(echo "$HUB_JSON" | jq -r '.schedule')
+  if [ "$HUB_UPDATE_SCHEDULE" != "" ] && [ "$HUB_UPDATE_SCHEDULE" != "null" ] ; then
+    hub_cron="# MOS HUB Update Interval:"'\n'"$HUB_UPDATE_SCHEDULE node /usr/local/bin/mos-api_cli hub:update > /dev/null 2>&1"'\n'
+  fi
+fi
+crontab="$crontab$hub_cron"
+
 # Get all crontab entries
 cron_jobs=""
 CRON_JSON=$(jq -r '.' /boot/config/system/cron.json 2>/dev/null)
