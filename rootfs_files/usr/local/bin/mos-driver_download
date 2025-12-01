@@ -131,6 +131,7 @@ $(ls -1 /boot/optional/drivers/$driver_dir/*/*.deb 2>/dev/null | sort -V | tail 
   done
   if [ "$REBOOT" = "true" ] ; then
     echo "Please reboot to complete the driver update"
+    notify -t "$NOTIFY_TITLE" -m "Please reboot to complete the driver update" -p "normal"
   fi
 elif [ "$MODE" = "update" ] ; then
   REBOOT=false
@@ -193,6 +194,7 @@ else
     continue
   fi
   echo "Download from driver: $1 successful, please reboot"
+  notify -t "$NOTIFY_TITLE" -m "Download from driver: $1 successful, please reboot" -p "normal"
 fi
 
 # Cleanup old drivers, or skip if no_driver_cleanup was passed over
