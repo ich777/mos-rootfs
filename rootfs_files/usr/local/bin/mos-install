@@ -60,14 +60,28 @@ case $FS_TYPE in
   ;;
 esac
 
+if [ "$4" = "true" ] ; then
+  if [ "$FS_TYPE" = "vfat" ] ; then
+    PARTITIONS="one"
+    EXTRA_MESSAGE=""
+    echo "WARNING: Extra partions on vfat boot devices are not supported"
+  else
+    PARTITIONS="three"
+    EXTRA_MESSAGE="2 with 16GB as the data partition in $FS_TYPE\n- Partition 3 with the remaining free space as an extra partition in $FS_TYPE"
+  fi
+else
+  PARTITIONS="two"
+  EXTRA_MESSAGE="2 with the remaining free space in $FS_TYPE as the data partition"
+fi
+
 # Ask user to continue except when quiet is passed over
 if [ "$3" != "quiet" ] ; then
   if [ "$FS_TYPE" = "vfat" ] ; then
     MESSAGE="This will format the whole device $DISK in fat32\n\nATTENTION: Formatting a whole device other than a USB Flash Drive is discuraged\nIf you are using whole disk then maybe consider other filesystem types like:\n  - ext4\n  - btrfs\n  - xfs"
   elif [ "$FS_TYPE" = "xfs" ] ; then
-    MESSAGE="This will format the device $DISK with two partitions:\n- Partition 1 with 64MB in fat32 for the ESP partition to allow EFI boot\n- Partition 2 with the remaining free space in $FS_TYPE as the data partition\n\nATTENTION: Formatting in xfs will probably cause issues with GRUB displaying\n           error messages and other various unwanted behaviour"
+    MESSAGE="This will format the device $DISK with $PARTITIONS partitions:\n- Partition 1 with 64MB in fat32 for the ESP partition to allow EFI boot\n- Partition $EXTRA_MESSAGE\n\nATTENTION: Formatting in xfs will probably cause issues with GRUB displaying\n           error messages and other various unwanted behaviour"
   else
-    MESSAGE="This will format the device $DISK with two partitions:\n- Partition 1 with 64MB in fat32 for the ESP partition to allow EFI boot\n- Partition 2 with the remaining free space in $FS_TYPE as the data partition"
+    MESSAGE="This will format the device $DISK with $PARTITIONS partitions:\n- Partition 1 with 64MB in fat32 for the ESP partition to allow EFI boot\n- Partition $EXTRA_MESSAGE"
   fi
   echo
   echo -e "$MESSAGE"
@@ -151,7 +165,14 @@ if [ "$FS_TYPE" != "vfat" ] ; then
   parted -s $DISK mklabel gpt
   parted -s $DISK mkpart ESP fat32 1MiB 65MiB
   parted -s $DISK set 1 boot on
-  parted -s $DISK mkpart primary $FS_TYPE 65MiB 100%
+
+  # Check if 3rd partition is wanted and partition disk
+  if [ "$PARTITIONS" = "three" ] ; then
+    parted -s $DISK mkpart primary $FS_TYPE 65MiB 16449MiB
+    parted -s $DISK mkpart primary $FS_TYPE 16449MiB 100%
+  else
+    parted -s $DISK mkpart primary $FS_TYPE 65MiB 100%
+  fi
 
   # Format ESP partition
   echo "Formatting ESP Partition with FAT32"
@@ -171,11 +192,24 @@ if [ "$FS_TYPE" != "vfat" ] ; then
   else
     OPT_FLAGS=""
   fi
-  # Format boot partition
-  echo "Formatting boot Partition with $FS_TYPE"
-  if ! mkfs.${FS_TYPE} ${FORCE_OPT}${OPT_FLAGS} -L "$LABEL" ${DISK}${PARTITION}2 ; then
-    echo "ERROR: Format from ESP Partition failed"
-    exit 1
+  # Format boot partition depending if 3rd partition is wanted
+  if [ "$PARTITIONS" = "three" ] ; then
+    echo "Formatting boot Partition with $FS_TYPE"
+    if ! mkfs.${FS_TYPE} ${FORCE_OPT}${OPT_FLAGS} -L "$LABEL" ${DISK}${PARTITION}2 ; then
+      echo "ERROR: Format from Boot Partition failed"
+      exit 1
+    fi
+    echo "Formatting extra Partition with $FS_TYPE"
+    if ! mkfs.${FS_TYPE} ${FORCE_OPT}${OPT_FLAGS} ${DISK}${PARTITION}3 ; then
+      echo "ERROR: Format from extra Partition failed"
+      exit 1
+    fi
+  else
+    echo "Formatting boot Partition with $FS_TYPE"
+    if ! mkfs.${FS_TYPE} ${FORCE_OPT}${OPT_FLAGS} -L "$LABEL" ${DISK}${PARTITION}2 ; then
+      echo "ERROR: Format from Boot Partition failed"
+      exit 1
+    fi
   fi
 
   # Mount partitions
