@@ -5,6 +5,8 @@ if [ -z "$1" ] ; then
   CONTAINER_UPDATES=()
   CONTAINERS_JSON=$(cat /var/lib/docker/mos/containers)
   CONTAINER_NAMES=$(echo $CONTAINERS_JSON | jq -r '.[].name')
+  COMPOSE_JSON=$(cat /var/lib/docker/mos/compose-containers)
+  COMPOSE_NAMES=$(echo $COMPOSE_JSON | jq -r '.[].services.[].container')
 else
   CONTAINERS_JSON=$(cat /var/lib/docker/mos/containers)
   if echo $CONTAINERS_JSON | jq -e --arg name "$1" '.[] | select(.name == $name)' >/dev/null ; then
@@ -15,7 +17,7 @@ else
   fi
 fi
 
-# Loop through containers
+# Loop through docker containers
 for container in $CONTAINER_NAMES
 do
   # Get necessary infromations for check and if there is already a update available
@@ -69,6 +71,66 @@ do
       echo "Update for $container found"
     else
       echo "Update for $container pending"
+    fi
+    CONTAINER_UPDATES+=("$container")
+  else
+    echo "Nothing to do for $container"
+  fi
+done
+
+# Loop through compose containers
+for container in $COMPOSE_NAMES
+do
+  # Get necessary infromations for check and if there is already a update available
+  STACK=$(echo $COMPOSE_JSON | jq -r --arg name "$container" '.[] | select(.services[]?.container == $name) | .stack')
+  REPO=$(echo $COMPOSE_JSON | jq -r --arg name "$container" '.[].services.[] | select(.container == $name) | .repo')
+  LOCAL_SHA=$(echo $COMPOSE_JSON | jq -r --arg name "$container" '.[].services.[] | select(.container == $name) | .local')
+  REMOTE_SHA_OLD=$(echo $COMPOSE_JSON | jq -r --arg name "$container" '.[].services.[] | select(.container == $name) | .remote')
+
+  # Check if a tag is applied, if not add :latest
+  if echo "$REPO" | grep -q ':' ; then
+    IMAGE="$REPO"
+  else
+    IMAGE="$REPO:latest"
+  fi
+
+  # Get remote SHA
+  REMOTE_SHA=$(image-sha $IMAGE)
+  REMOTE_SHA=$(echo "$REMOTE_SHA" | head -1)
+
+  # Safety check if remote SHA is valid
+  case "$REMOTE_SHA" in
+    sha*)
+      :
+      ;;
+    *)
+      echo "ERROR: Error getting latest digest for compose container $container"
+      ERROR=true
+      continue
+      ;;
+  esac
+
+  # Compare SHA values and inject new remote SHA to containers file
+  if [ "$LOCAL_SHA" != "$REMOTE_SHA" ] ; then
+    if [ "$REMOTE_SHA" != "$REMOTE_SHA_OLD" ] ; then
+      jq --arg container "$container" \
+         --arg local "$LOCAL_SHA" \
+         --arg remote "$REMOTE_SHA" '
+        map(
+          .services |=
+          with_entries(
+            if .value.container == $container then
+              .value.remote |= $remote
+               | .value.local |= $local
+            else
+              .
+            end
+          )
+        )
+      ' /var/lib/docker/mos/compose-containers > /var/lib/docker/mos/compose-containers.tmp && mv /var/lib/docker/mos/compose-containers.tmp /var/lib/docker/mos/compose-containers
+      echo "Update for $container from compose stack $STACK found"
+    else
+      echo "Update for $container from compose stack $STACK pending"
     fi
     CONTAINER_UPDATES+=("$container")
   else
