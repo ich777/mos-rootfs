@@ -62,9 +62,14 @@ do
     echo "Updating compose stack $stack"
     if [ -d "$DOCKER_APPDATA/compose_$stack" ] ; then
       cd $DOCKER_APPDATA/compose_$stack
+      if [ -f "$DOCKER_APPDATA/compose_$stack/mos.override.yaml" ] ; then
+        COMPOSE_ARGS="-f compose.yaml -f mos.override.yaml"
+      else
+        COMPOSE_ARGS="-f compose.yaml"
+      fi
       docker-compose down
       docker-compose pull
-      docker-compose up -d --remove-orphans
+      docker-compose $COMPOSE_ARGS up -d --remove-orphans
       CONTAINER_UPDATES+=("$stack")
     else
       echo "ERROR: Stack directory $DOCKER_APPDATA/compose_$stack not found"
