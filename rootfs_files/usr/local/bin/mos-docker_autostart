@@ -32,5 +32,27 @@ if [ ! -z "$AUTOSTART_CONTAINERS" ] && [ "$AUTOSTART_CONTAINERS" != "null" ] ; t
   done
 fi
 
+COMPOSE_STACKS=$(jq -r '.[] | select(.compose == true) | "\(.index):\(.name)"' /var/lib/docker/mos/groups 2>/dev/null | sort -n -t: -k1,1)
+if [ ! -z "$COMPOSE_STACKS" ] && [ "$COMPOSE_STACKS" != "null" ] ; then
+  DOCKER_APPDATA=$(jq -r '.appdata' /boot/config/docker.json)
+  for stack in $COMPOSE_STACKS
+  do
+    STACK=${stack#*:}
+    AUTOSTART_STACK=false
+    AUTOSTART_STACK=$(jq -r --arg name "$STACK" '.[] | select(.stack == $name) | .autostart' /var/lib/docker/mos/compose-containers)
+    if [ "$AUTOSTART_STACK" = "true" ] ; then
+      if [ -d "$DOCKER_APPDATA/compose_$STACK" ] ; then
+        cd $DOCKER_APPDATA/compose_$STACK
+        if [ -f "$DOCKER_APPDATA/compose_$stack/mos.override.yaml" ] ; then
+          COMPOSE_ARGS="-f compose.yaml -f mos.override.yaml"
+        else
+          COMPOSE_ARGS="-f compose.yaml"
+        fi
+        docker-compose $COMPOSE_ARGS up -d
+      fi
+    fi
+  done
+fi
+
 # Start Docker container network watchdog
 /etc/init.d/docker-watchdog start
