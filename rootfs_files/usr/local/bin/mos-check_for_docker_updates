@@ -3,12 +3,12 @@
 # Check if argument was passed over (check single or all containers)
 if [ -z "$1" ] ; then
   CONTAINER_UPDATES=()
-  CONTAINERS_JSON=$(cat /var/lib/docker/mos/containers)
+  CONTAINERS_JSON=$(cat /var/lib/docker/mos/containers 2>/dev/null)
   CONTAINER_NAMES=$(echo $CONTAINERS_JSON | jq -r '.[].name')
-  COMPOSE_JSON=$(cat /var/lib/docker/mos/compose-containers)
+  COMPOSE_JSON=$(cat /var/lib/docker/mos/compose-containers 2>/dev/null)
   COMPOSE_NAMES=$(echo $COMPOSE_JSON | jq -r '.[].services.[].container')
 else
-  CONTAINERS_JSON=$(cat /var/lib/docker/mos/containers)
+  CONTAINERS_JSON=$(cat /var/lib/docker/mos/containers 2>/dev/null)
   if echo $CONTAINERS_JSON | jq -e --arg name "$1" '.[] | select(.name == $name)' >/dev/null ; then
     CONTAINER_NAMES=$1
   else
