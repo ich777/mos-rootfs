@@ -179,6 +179,11 @@ mount_script() {
   fi
 }
 
+# Make mount shared if specified
+make_shared() {
+  mount --make-shared /mnt/$1
+}
+
 # Loop through pools and try to mount them if automount is enabled
 for POOL in $POOLS
 do
@@ -198,6 +203,7 @@ do
   if [ "$POOL_TYPE" == "mergerfs" ] ; then
     create_pool_directory "$POOL" "$POOL_TYPE" || { echo "Pool $POOL already mounted" ; continue ; }
     CREATE_POLICY=$(echo $POOL_JSON | jq -r '.config.policies.create')
+    POOL_SHARED=$(echo "$POOL_JSON" | jq -r '.config.shared // false')
     for data_slot in $(echo $POOL_JSON | jq -r '.data_devices[].slot')
     do
       mergerfs_create_disk_directory "$POOL" "$data_slot"
@@ -218,7 +224,11 @@ do
         MOUNTS="$MOUNTS:/var/mergerfs/$POOL/disk$data_slot"
       fi
     done
+
     mergerfs_mount_pool "$MOUNTS" "$POOL" "$CREATE_POLICY"
+    if [ "$POOL_SHARED" = "true" ] ; then
+      make_shared "$POOL"
+    fi
     PARITY_COUNT=$(echo $POOL_JSON | jq -r '.parity_devices | length')
     if [ "$PARITY_COUNT" != "0" ] ; then
       for parity_slot in $(echo $POOL_JSON | jq -r '.parity_devices[].slot')
@@ -325,6 +335,7 @@ do
     fi
 
     CREATE_POLICY=$(echo $POOL_JSON | jq -r '.config.policies.create')
+    POOL_SHARED=$(echo "$POOL_JSON" | jq -r '.config.shared // false')
     for data_slot in $(echo $POOL_JSON | jq -r '.data_devices[].slot')
     do
       mergerfs_create_disk_directory "$POOL" "$data_slot"
@@ -353,7 +364,11 @@ do
         MOUNTS="$MOUNTS:/var/mergerfs/$POOL/disk$data_slot"
       fi
     done
+
     mergerfs_mount_pool "$MOUNTS" "$POOL" "$CREATE_POLICY"
+    if [ "$POOL_SHARED" = "true" ] ; then
+      make_shared "$POOL"
+    fi
     PATH_RULE_COUNT=$(echo $POOL_JSON | jq -r '.config.path_rules | length')
     if [ "$PATH_RULE_COUNT" != "0" ] ; then
       for path in $(echo $POOL_JSON | jq -r '.config.path_rules[].path')
@@ -392,6 +407,7 @@ do
     create_pool_directory "$POOL" "$POOL_TYPE" || { echo "Pool $POOL already mounted" ; continue ; }
     logger "Mounting$ENCRYPTED_TEXT btrfs pool: $POOL"
     DISK_ID=$(echo "$POOL_JSON" | jq -r --arg disk_no "$DISK_NO" '.data_devices[0].id')
+    POOL_SHARED=$(echo "$POOL_JSON" | jq -r '.config.shared // false')
     if [ "$POOL_ENCRYPTED" == "true" ] ; then
       for data_slot in $(echo $POOL_JSON | jq -r '.data_devices[].slot')
       do
@@ -399,6 +415,7 @@ do
         DISK_ID_BTRFS=$(echo "$DISK_DETAILS" | jq -r '.id')
         btrfs_luks_open "$DISK_ID_BTRFS" "$POOL" "$data_slot" "$DECRYPTION_KEY"
       done
+
       btrfs_mount_pool "/dev/mapper/" "$POOL" "true"
       EXIT_STATUS=$?
       if [ "$EXIT_STATUS" == "1" ] ; then
@@ -408,6 +425,9 @@ do
       fi
     else
       btrfs_mount_pool "$DISK_ID" "$POOL" "false"
+    fi
+    if [ "$POOL_SHARED" == "true" ] ; then
+      make_shared "$POOL"
     fi
     # Start scrub if enabled on unclean shutdown
     if [ "$UNCLEAN_SHUTDOWN" == "true" ] ; then
@@ -426,6 +446,8 @@ do
     create_pool_directory "$POOL" "$POOL_TYPE" || { echo "Pool $POOL already mounted" ; continue ; }
     logger "Mounting$ENCRYPTED_TEXT ext4 disk: $POOL"
     DISK_ID=$(echo "$POOL_JSON" | jq -r --arg disk_no "$DISK_NO" '.data_devices[0].id')
+    POOL_SHARED=$(echo "$POOL_JSON" | jq -r '.config.shared // false')
+
     ext4_mount_disk "$DISK_ID" "$POOL" "$POOL_ENCRYPTED" "$DECRYPTION_KEY"
     EXIT_STATUS=$?
     if [ "$EXIT_STATUS" != "0" ] ; then
@@ -433,16 +455,24 @@ do
       rmdir /mnt/$POOL
       continue 2
     fi
+    if [ "$POOL_SHARED" == "true" ] ; then
+      make_shared "$POOL"
+    fi
   elif [ "$POOL_TYPE" == "xfs" ] ; then
     create_pool_directory "$POOL" "$POOL_TYPE" || { echo "Pool $POOL already mounted" ; continue ; }
     logger "Mounting$ENCRYPTED_TEXT xfs disk: $POOL"
     DISK_ID=$(echo "$POOL_JSON" | jq -r --arg disk_no "$DISK_NO" '.data_devices[0].id')
+    POOL_SHARED=$(echo "$POOL_JSON" | jq -r '.config.shared // false')
+
     xfs_mount_disk "$DISK_ID" "$POOL" "$POOL_ENCRYPTED" "$DECRYPTION_KEY"
     EXIT_STATUS=$?
     if [ "$EXIT_STATUS" != "0" ] ; then
       umount /mnt/$POOL >/dev/null 2>&1
       rmdir /mnt/$POOL
       continue 2
+    fi
+    if [ "$POOL_SHARED" == "true" ] ; then
+      make_shared "$POOL"
     fi
   fi
   mount_script "$POOL"
