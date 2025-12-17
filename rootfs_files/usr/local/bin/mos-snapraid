@@ -32,10 +32,12 @@ if [ "$2" = "force_stop" ] ; then
   fi
 elif [ "$2" = "fix" ] ; then
   if [ -z "$3" ] ; then
-    echo "ERROR: Please specify the data disk that you want to rebuild"
-    exit 1
+    echo "WARNING: All disks will be fixed when no disk(s) to fix is/are specified"
+    echo "         Continuing in 15 seconds..."
+    sleep 15
+    FIX_DISKS=""
   else
-    FIX_DISKS=$(printf ' -d %s' ${3//,/ })
+    FIX_DISKS="$(printf ' -d %s' ${3//,/ })"
   fi
 else
   FIX_DISKS=""
