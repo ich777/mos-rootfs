@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Check if SnapRAID configuration is available
 if [ -z "$1" ] ; then
   exit 1
@@ -16,7 +16,7 @@ if [ "$2" != "force_stop" ] && [ -f /run/snapraid/$1.socket ] ; then
   exit 1
 fi
 
-# Execute force_stop if passed over
+# Security checks for second argument
 if [ "$2" = "force_stop" ] ; then
   if [ -f /run/snapraid/$1.socket ] ; then
     echo "Trying to stop currently running SnapRAID operation on Pool: $1"
@@ -30,6 +30,15 @@ if [ "$2" = "force_stop" ] ; then
     echo "No SnapRAID operation for Pool: $1 running"
     exit 0
   fi
+elif [ "$2" = "fix" ] ; then
+  if [ -z "$3" ] ; then
+    echo "ERROR: Please specify the data disk that you want to rebuild"
+    exit 1
+  else
+    FIX_DISKS=$(printf ' -d %s' ${3//,/ })
+  fi
+else
+  FIX_DISKS=""
 fi
 
 # Get Pool information
@@ -69,7 +78,7 @@ done
 {
   # Send notification and start SnapRAID operation
   notify -t "SnapRAID" -m "Starting SnapRAID operation $2 for Pool: $1" -p "normal"
-  snapraid -c /boot/config/snapraid/$1.conf -l /var/log/snapraid/$1 $2 > /run/snapraid/$1.socket 2>&1
+  snapraid -c /boot/config/snapraid/$1.conf$FIX_DISKS -l /var/log/snapraid/$1 $2 > /run/snapraid/$1.socket 2>&1
 
   # Sync filesystems and wait for additional 3 minutes
   sync
