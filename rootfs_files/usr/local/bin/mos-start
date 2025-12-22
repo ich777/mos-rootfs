@@ -10,6 +10,11 @@ HUB_JSON=$(jq '.' /boot/config/system/hub.json 2>/dev/null)
 # Execute echo to get one emty line
 echo
 
+# Execute sensors-detect
+start_sensors_detect() {
+  /etc/init.d/sensors start
+}
+
 # Execute start script if found
 start_script() {
   if [ -f /boot/optional/scripts/pre-start.sh ] ; then
@@ -320,6 +325,7 @@ if [ "$1" = "os" ] ; then
   fi
   start_notify
   start_smart
+  start_sensors_detect
   start_script
   modify_issue
   start_ntp
