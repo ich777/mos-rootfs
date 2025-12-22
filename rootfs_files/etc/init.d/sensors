@@ -23,15 +23,15 @@ load_modules() {
   MODULES=$($SENSORS_DETECT --auto 2>/dev/null | sed -n '/^#----cut here----$/,/^#----cut here----$/p')
   if [ ! -z "$MODULES" ] ; then
     echo "$MODULES" | while IFS= read -r line; do
-    case "$line" in
-      '#'*)
-        # Do nothing with commented lines
-      ;;
-      *)
-        /usr/sbin/modprobe $line 2>/dev/null
-      ;;
-    esac
-done
+      case "$line" in
+        '#'*)
+          # Do nothing with commented lines
+        ;;
+        *)
+          /usr/sbin/modprobe $line 2>/dev/null
+        ;;
+      esac
+    done
   fi
 }
 
