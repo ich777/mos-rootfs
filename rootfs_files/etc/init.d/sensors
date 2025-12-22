@@ -1,0 +1,51 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:          sensors
+# Required-Start:    $local_fs $remote_fs
+# Required-Stop:     $local_fs $remote_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      
+# Short-Description: sensors-detect --auto
+# Description:       runns sensors-detect --auto on boot and load modules
+### END INIT INFO
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+SENSORS_DETECT="/usr/sbin/sensors-detect"
+NAME="sensors-detect"
+DESC="sensors-detect"
+USER="root"
+
+. /lib/init/vars.sh
+. /lib/lsb/init-functions
+
+load_modules() {
+  MODULES=$($SENSORS_DETECT --auto 2>/dev/null | sed -n '/^#----cut here----$/,/^#----cut here----$/p')
+  if [ ! -z "$MODULES" ] ; then
+    echo "$MODULES" | while IFS= read -r line; do
+    case "$line" in
+      '#'*)
+        # Do nothing with commented lines
+      ;;
+      *)
+        /usr/sbin/modprobe $line 2>/dev/null
+      ;;
+    esac
+done
+  fi
+}
+
+case "$1" in
+  start)
+    log_daemon_msg "Starting $DESC" "$NAME"
+    load_modules
+    case "$?" in
+      0|1) log_end_msg 0 ;;
+      2)   log_end_msg 1 ;;
+    esac
+  ;;
+  *)
+    echo "Usage: $NAME start" >&2
+    exit 3
+  ;;
+esac
