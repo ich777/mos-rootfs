@@ -21,6 +21,11 @@ if [ -z "$SPINDOWN" ] ; then
   SPINDOWN=$(/usr/bin/jq -r '.global_spindown' /boot/config/system.json 2>/dev/null)
 fi
 
+# Exit if spindown is set to 0, hence we need no spindown
+if [ "$SPINDOWN" = "0" ] ; then
+  exit 0
+fi
+
 # Set check interval in seconds
 INTERVAL=$((SPINDOWN * 60))
 
