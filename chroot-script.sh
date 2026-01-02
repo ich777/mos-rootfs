@@ -49,31 +49,44 @@ if [ ! -f /etc/rc6.d/K01stop-mos ] ; then
   ln -sf ../init.d/stop-mos K01stop-mos
 fi
 
-rm -f /etc/rc2.d/S02docker /etc/rc2.d/S02lxc /etc/rc2.d/S02lxc-net /etc/rc2.d/S02nginx /etc/rc2.d/S02smbd /etc/rc2.d/S01samba-ad-dc \
-  /etc/rc2.d/S02virtlogd /etc/rc2.d/S02ssh /etc/rc2.d/S03libvirtd /etc/rc2.d/S04libvirt-guests /etc/rc2.d/S01nmbd /etc/rc2.d/S02ntpsec \
-  /etc/rc2.d/S02nut-server /etc/rc2.d/S03nut-client /etc/rcS.d/S15lm-sensors /etc/rc2.d/S02tgt /etc/rcS.d/K13iscsid /etc/rcS.d/K13open-iscsi \
-  /etc/rc2.d/S03nginx /etc/rcS.d/S11brightness /etc/rc2.d/S03nfs-kernel-server /etc/rcS.d/S14nfs-common /etc/rcS.d/S16mountnfs-bootclean.sh \
-  /etc/rcS.d/S15mountnfs.sh /etc/rcS.d/S07cryptdisks-early /etc/rcS.d/S08cryptdisks /etc/rc2.d/S03cron /etc/rc5.d/S03cron /etc/rcS.d/S03udev \
-  /etc/rc2.d/S02smartmontools
-
-rm -f /etc/rc6.d/K01nginx /etc/rc6.d/K01nmbd /etc/rc6.d/K01nut-client /etc/rc6.d/K01nut-server /etc/rc6.d/K01open-iscsi \
-  /etc/rc6.d/K01samba-ad-dc /etc/rc6.d/K01smbd /etc/rc6.d/K01tgt /etc/rc6.d/K02iscsid /etc/rc6.d/K09cryptdisks /etc/rc6.d/K10cryptdisks-early
+# Remove default startup symlinks
+rm -f /etc/rcS.d/S15lm-sensors /etc/rcS.d/K13iscsid /etc/rcS.d/K13open-iscsi /etc/rcS.d/S11brightness /etc/rcS.d/S14nfs-common \
+  /etc/rcS.d/S16mountnfs-bootclean.sh /etc/rcS.d/S15mountnfs.sh /etc/rcS.d/S07cryptdisks-early /etc/rcS.d/S08cryptdisks /etc/rcS.d/S03udev
 
 rm -f /etc/rc0.d/K01nginx /etc/rc0.d/K01nmbd /etc/rc0.d/K01nut-client /etc/rc0.d/K01nut-server /etc/rc0.d/K01open-iscsi \
   /etc/rc0.d/K01samba-ad-dc /etc/rc0.d/K01smbd /etc/rc0.d/K01tgt /etc/rc0.d/K02iscsid /etc/rc0.d/K09cryptdisks /etc/rc0.d/K10cryptdisks-early
 
+rm -f /etc/rc2.d/S02docker /etc/rc2.d/S02lxc /etc/rc2.d/S02lxc-net /etc/rc2.d/S02nginx /etc/rc2.d/S02smbd /etc/rc2.d/S01samba-ad-dc \
+  /etc/rc2.d/S02virtlogd /etc/rc2.d/S02ssh /etc/rc2.d/S04libvirt-guests /etc/rc2.d/S01nmbd /etc/rc2.d/S02ntpsec /etc/rc2.d/S02nut-server \
+  /etc/rc2.d/S03nut-client /etc/rc2.d/S02tgt /etc/rc2.d/S03nginx /etc/rc2.d/S03nfs-kernel-server /etc/rc2.d/S03cron /etc/rc2.d/S02smartmontools \
+  /etc/rc2.d/S03libvirtd
+
+rm -f /etc/rc5.d/S03cron
+
+rm -f /etc/rc6.d/K01nginx /etc/rc6.d/K01nmbd /etc/rc6.d/K01nut-client /etc/rc6.d/K01nut-server /etc/rc6.d/K01open-iscsi \
+  /etc/rc6.d/K01samba-ad-dc /etc/rc6.d/K01smbd /etc/rc6.d/K01tgt /etc/rc6.d/K02iscsid /etc/rc6.d/K09cryptdisks /etc/rc6.d/K10cryptdisks-early
+
+# Move rc scripts
 mv /etc/rcS.d/S11resolvconf /etc/rcS.d/S12resolvconf
 mv /etc/rcS.d/S12networking /etc/rcS.d/S11networking
 mv /etc/rc2.d/S04stop-bootlogd /etc/rc2.d/S99stop-bootlogd
 
+# Disable Smartmontools Mail service
 mv /etc/smartmontools/run.d/10mail /etc/smartmontools/run.d/10mail.disabled
 
+# Inject default hostname
 echo "MOS" > /etc/hostname
 
+# Inject text into fstab
+echo "# By default empty fstab for MOS" > /etc/fstab
+
+# Create target directory
 mkdir -p /etc/target
 
+# Remove default logs/config/udev files
 rm -rf /var/log/* /etc/ssh/*_key* /var/lib/lxc /var/lib/docker rm -rf /var/www/* /etc/init.d/.depend* /etc/nut/* /lib/udev/rules.d/85-hdparm.rules
 
+# Sert permissionsions
 chown -R www-data:www-data /var/www
 
 groupadd -g 500 mos
