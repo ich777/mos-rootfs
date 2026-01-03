@@ -127,7 +127,9 @@ if [[ "$paths_count" != "null" && "$paths_count" != "0" ]]; then
         host_path=${appdata_path%/}/${host_path#*/appdata/}
       fi
       if [[ -f "$host_path" ]]; then
-        echo "INFO: $host_path is a file, skipping."
+        echo "INFO: $host_path is a file on the host."
+      elif [[ -S "$host_path" ]]; then
+        echo "INFO: $host_path is a socket on the host."
       elif [[ ! -d "$host_path" ]]; then
         if ! mkdir -p "$host_path" 2>/dev/null; then
           echo "WARNING: Failed to create directory $host_path, skipping volume mount"
