@@ -30,7 +30,7 @@ RAMTMP=yes
 #TMPFS_SIZE=20%VM
 #RUN_SIZE=10%
 #LOCK_SIZE=5242880 # 5MiB
-# MOS Custom: Set /dev/shm size to 50% from RAM size
+# MOS Custom: Set /tmp & /dev/shm size to 50% from RAM size
 SHM_SIZE=50%
 TMP_SIZE=50%
 
