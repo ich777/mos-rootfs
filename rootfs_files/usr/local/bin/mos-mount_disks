@@ -184,6 +184,11 @@ make_shared() {
   mount --make-shared /mnt/$1
 }
 
+# chown pool
+chown_pool() {
+  chown mos:mos /mnt/$1
+}
+
 # Loop through pools and try to mount them if automount is enabled
 for POOL in $POOLS
 do
@@ -267,6 +272,7 @@ do
         fi
       done
     fi
+    chown_pool "$POOL"
   elif [ "$POOL_TYPE" == "nonraid" ] ; then
     # Make sure module is available and activated
     ! modinfo md-nonraid >/dev/null 2>&1 && \
@@ -405,6 +411,7 @@ do
     else
       echo "set md_write_method 0" > /proc/nmdcmd
     fi
+    chown_pool "$POOL"
   elif [ "$POOL_TYPE" == "btrfs" ] ; then
     create_pool_directory "$POOL" "$POOL_TYPE" || { echo "Pool $POOL already mounted" ; continue ; }
     logger "Mounting$ENCRYPTED_TEXT btrfs pool: $POOL"
@@ -444,6 +451,7 @@ do
         fi
       fi
     fi
+    chown_pool "$POOL"
   elif [ "$POOL_TYPE" == "ext4" ] ; then
     create_pool_directory "$POOL" "$POOL_TYPE" || { echo "Pool $POOL already mounted" ; continue ; }
     logger "Mounting$ENCRYPTED_TEXT ext4 disk: $POOL"
@@ -460,6 +468,7 @@ do
     if [ "$POOL_SHARED" == "true" ] ; then
       make_shared "$POOL"
     fi
+    chown_pool "$POOL"
   elif [ "$POOL_TYPE" == "xfs" ] ; then
     create_pool_directory "$POOL" "$POOL_TYPE" || { echo "Pool $POOL already mounted" ; continue ; }
     logger "Mounting$ENCRYPTED_TEXT xfs disk: $POOL"
@@ -476,6 +485,7 @@ do
     if [ "$POOL_SHARED" == "true" ] ; then
       make_shared "$POOL"
     fi
+    chown_pool "$POOL"
   fi
   mount_script "$POOL"
   unset POOL_JSON DISK_COUNT DISK_NO MOUNTS PARITY_COUNT POOL_ENCRYPTED ENCRYPTED_TEXT KEY EXIT_STATUS UNCLEAN_CHECK POOL_DEVICES
