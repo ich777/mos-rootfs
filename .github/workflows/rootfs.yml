@@ -19,6 +19,11 @@ on:
         required: true
         default: '6.17.4'
         type: string
+      node_version:
+        description: 'Node Version'
+        required: true
+        default: '22.19.0'
+        type: string
       docker_version:
         description: 'Docker Version'
         required: false
@@ -233,7 +238,7 @@ jobs:
 
     - name: Modify rootfs
       run: |
-        chroot ${{ github.workspace }}/rootfs /tmp/chroot-script.sh
+        chroot ${{ github.workspace }}/rootfs /tmp/chroot-script.sh "${{ github.event.inputs.node_version }}"
 
     - name: Create MOS release
       run: |
@@ -275,7 +280,7 @@ jobs:
         RECOMMENDED_KERNEL=${{ github.event.inputs.mos_recommended_kernel }}-mos
 
         chmod +x $WORKDIR/mos-json
-        $WORKDIR/mos-json "$CHANNEL" "$VERSION" "$RECOMMENDED_KERNEL" "$ROOTFS" "$FRONTEND_V" "$API_V" > $ROOTFS/etc/mos-release.json
+        $WORKDIR/mos-json "$CHANNEL" "$VERSION" "$RECOMMENDED_KERNEL" "$ROOTFS" "$FRONTEND_V" "$API_V" "${{ github.event.inputs.node_version }}" > $ROOTFS/etc/mos-release.json
         chown root:root $ROOTFS/etc/mos-release.json
         chmod 755 $ROOTFS/etc/mos-release.json
         cp $ROOTFS/etc/mos-release.json $WORKDIR/release/mos-release.json
