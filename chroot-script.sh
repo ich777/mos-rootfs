@@ -105,11 +105,13 @@ cd /etc
 ln -sf /proc/mounts mtab
 
 cd /tmp
-if ! wget -O /tmp/node.xz https://nodejs.org/dist/v22.19.0/node-v22.19.0-linux-x64.tar.xz ; then
+if ! wget -O /tmp/node.xz https://nodejs.org/dist/v${1}/node-v${1}-linux-x64.tar.xz ; then
   exit 1
 fi
 tar -xf /tmp/node.xz
-rm -f /tmp/node-*/CHANGE* /tmp/node-*/README* /tmp/node-*/LICENSE*
+mkdir -p /usr/share/doc/node
+mv /tmp/node-*/LICENSE* /tmp/node-*/share/doc/node/
+rm -f /tmp/node-*/CHANGE* /tmp/node-*/README*
 cp -R /tmp/node-*/* /usr/
 
 # /etc/passwd editieren:
@@ -122,7 +124,7 @@ rm -rf /home
 
 rm -rf /usr/include/* /usr/local/games /usr/local/include/* /usr/share/*/include/
 find /usr/* -name "*.a" -exec rm -f {} \; 2>/dev/null
-rm -rf /usr/share/man /usr/share/doc /usr/share/doc-base /usr/share/info /usr/share/help
+rm -rf /usr/share/man /usr/share/doc-base /usr/share/info /usr/share/help
 rm -rf /usr/share/qemu/edk2-* /usr/bin/qemu-aarch64* /usr/bin/qemu-system-aarch64
 rm -rf /etc/network/interfaces /etc/network/interfaces.d
 touch /etc/network/interfaces
