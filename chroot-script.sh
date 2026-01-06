@@ -120,6 +120,11 @@ sed -i '/^root::/c root::0:0:root:/root:/bin/bash' /etc/passwd
 # make cron less verbose
 echo -e "\n# MOS Custom - make cron less verbose\nEXTRA_OPTS='-L 5'" >> /etc/default/cron
 
+# Clean up /usr/share/doc directory
+find /usr/share/doc -type f ! -name "copyright*" ! -name "COPYRIGHT*" ! -name "license*" ! -name "LICENSE*" ! -name "LICENCE*" \
+  ! -name "licence*" ! -name "NOTICE*" ! -name "notice*" ! -name "COPYING*" ! -name "copying*" -delete
+find /usr/share/doc -type d -empty -delete
+
 rm -rf /home
 
 rm -rf /usr/include/* /usr/local/games /usr/local/include/* /usr/share/*/include/
