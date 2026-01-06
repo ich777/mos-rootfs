@@ -1,12 +1,15 @@
 #!/bin/bash
 
-# OS-Informationen sammeln
+# Collect OS-Information
 os_info=$(cat $4/etc/os-release | jq -R 'split("=") | {(.[0]): (.[1] | gsub("\""; ""))}' | jq -s 'add')
 
-# Package-Informationen sammeln
+# Collect Package-Information
 packages=$(chroot $4 dpkg-query -l | awk '$1 == "ii" {print $2, $3}' | jq -R 'split(" ") | {name: .[0], version: .[1]}' | jq -s .)
 
-# Alles zusammenführen
+# Add node to package list and sort
+packages=$(echo "$packages" | jq --arg version "$7" '. + [{name: "node", version: $version}] | sort_by(.name)')
+
+# Construct json
 jq -n \
   --argjson os_info "$os_info" \
   --argjson packages "$packages" \
