@@ -6,6 +6,7 @@ LXC_JSON=$(jq '.' /boot/config/lxc.json 2>/dev/null)
 VM_JSON=$(jq '.' /boot/config/vm.json 2>/dev/null)
 NETWORK_JSON=$(jq '.' /boot/config/network.json 2>/dev/null)
 HUB_JSON=$(jq '.' /boot/config/system/hub.json 2>/dev/null)
+ZRAM_JSON=$(jq '.' /boot/config/system/zram.json 2>/dev/null)
 
 # Execute echo to get one emty line
 echo
@@ -354,6 +355,28 @@ start_swap() {
   fi
 }
 
+# zram swap
+start_zram_swap() {
+  ZRAM=$(echo $ZRAM_JSON | jq -r '.enabled')
+  if [ "$ZRAM" = "true" ] ; then
+    ZRAM_DEVICES=$(echo $ZRAM_JSON | jq -r '.zram_devices')
+    if [ "$ZRAM_DEVICES" -gt "0" ] ; then
+      modprobe zram num_devices=$ZRAM_DEVICES
+      ZRAM_SWAP=$(echo "$ZRAM_JSON" | jq -r '.devices[] | select(.type == "swap") | .index // ""')
+      for swap in $ZRAM_SWAP
+      do
+        SWAP_JSON=$(echo "$ZRAM_JSON" | jq -r --arg index "$swap" '.devices[] | select(.index == ($index | tonumber))')
+        SWAP_INDEX=$(echo "$SWAP_JSON" | jq -r '.index')
+        SWAP_ALGORITHM=$(echo "$SWAP_JSON" | jq -r '.algorithm')
+        SWAP_PRIORITY=$(echo "$SWAP_JSON" | jq -r '.config.priority // "-2"')
+        mkswap "/dev/zram${SWAP_INDEX}" >/dev/null 2>&1
+        swapon --priority "$SWAP_PRIORITY" "/dev/zram${SWAP_INDEX}" >/dev/null 2>&1
+        echo $SWAP_INDEX $SWAP_ALGORITHM $SWAP_PRIORITY
+      done
+    fi
+  fi
+}
+
 # Define argument conditions
 if [ "$1" = "os" ] ; then
   STARTUP_SOUND=$(echo $SYSTEM_JSON | jq -r '.notification_sound.startup')
@@ -375,6 +398,7 @@ if [ "$1" = "os" ] ; then
   start_iscsi_target
   mount_remotes
   start_swap
+  start_zram_swap
   optional_packages
   start_nut
   start_nmbd
