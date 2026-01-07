@@ -326,6 +326,34 @@ md5_check_result() {
   fi
 }
 
+# SWAP
+start_swap() {
+  SWAP=$(echo $SYSTEM_JSON | jq -r '.swapfile.enabled')
+  if [ "$SWAP" = "true" ] ; then
+    SWAP_PATH=$(echo $SYSTEM_JSON | jq -r '.swapfile.path')
+    SWAP_PRIORITY=$(echo $SYSTEM_JSON | jq -r '.swapfile.priority')
+    ZSWAP=$(echo $SYSTEM_JSON | jq -r '.swapfile.config.zswap')
+    if [ -f "$SWAP_PATH/.swapfile" ] ; then
+      swapon --priority "$SWAP_PRIORITY" "$SWAP_PATH/.swapfile"
+      if [ "$ZSWAP" = "true" ] ; then
+        ZSWAP_SHRINKER=$(echo $SYSTEM_JSON | jq -r 'if .swapfile.config.shrinker then "Y" else "N" end')
+        ZSWAP_MAX_POOL=$(echo $SYSTEM_JSON | jq -r '.swapfile.config.max_pool_percent')
+        ZSWAP_COMPRESSOR=$(echo $SYSTEM_JSON | jq -r '.swapfile.config.compressor')
+        ZSWAP_ACCEPT_THRESHOLD=$(echo $SYSTEM_JSON | jq -r '.swapfile.config.accept_threshold_percent')
+        echo "$ZSWAP_SHRINKER" > /sys/module/zswap/parameters/shrinker_enabled
+        echo "$ZSWAP_MAX_POOL" > /sys/module/zswap/parameters/max_pool_percent
+        echo "$ZSWAP_COMPRESSOR" > /sys/module/zswap/parameters/compressor
+        echo "$ZSWAP_SHRINKER" > /sys/module/zswap/parameters/shrinker_enabled
+        echo "$ZSWAP_ACCEPT_THRESHOLD" > /sys/module/zswap/parameters/accept_threshold_percent
+        echo "Y" > /sys/module/zswap/parameters/enabled
+      fi
+    else
+      logger -t "MOS SWAP" "ERROR: Swapfile not found, not creating swap"
+      return
+    fi
+  fi
+}
+
 # Define argument conditions
 if [ "$1" = "os" ] ; then
   STARTUP_SOUND=$(echo $SYSTEM_JSON | jq -r '.notification_sound.startup')
@@ -346,6 +374,7 @@ if [ "$1" = "os" ] ; then
   mount_disks
   start_iscsi_target
   mount_remotes
+  start_swap
   optional_packages
   start_nut
   start_nmbd
