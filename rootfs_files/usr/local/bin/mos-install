@@ -261,6 +261,10 @@ else
   # Copy files from current boot device
   echo "Copying files from boot device"
   cp -R /boot/* /var/mos/installer/boot/
+  # Remove unclean shutdown file if it's there
+  if [ -f /var/mos/installer/boot/config/system/mos.chk ] ; then
+    rm -f /var/mos/installer/boot/config/system/mos.chk
+  fi
 
   # Install GRUB bootloader
   echo "Installing GRUB"
