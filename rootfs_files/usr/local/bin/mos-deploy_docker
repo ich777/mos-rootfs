@@ -357,8 +357,12 @@ fi
 # Create container or exit on error
 if ! "${docker_cmd[@]}"; then
   echo "Error creating container: $name"
+  echo -e "\n${docker_cmd[@]}"
   exit 1
 fi
+
+# Display docker command
+echo -e "\n${docker_cmd[@]}"
 
 # Remove all dangling images from the deployed container repo (leftovers)
 if [[ "$UPDATE" = "true" ]]; then
