@@ -78,6 +78,40 @@ else
   /bin/sleep infinity
 fi
 
+# Execute md5 check if not disabled
+if [ ! -f /boot/config/system/md5check_disabled ] ; then
+  /usr/bin/echo "Starting .md5 check from boot files"
+  MD5_BAD="false"
+  for file in $(/usr/bin/ls /boot/*.md5)
+  do
+    FILENAME=${file##*/}
+    if [ ! -f /boot/${FILENAME%.*} ] ; then
+      /usr/bin/echo "WARNING: File ${FILENAME%.*} not found, skipping"
+      continue
+    else
+      MD5_GEN=$(/usr/bin/md5sum /boot/${FILENAME%.*} | /usr/bin/awk '{print $1}')
+    fi
+    MD5_SUM=$(/usr/bin/cat /boot/$FILENAME | /usr/bin/awk '{print $1}')
+    if [ "$MD5_GEN" != "$MD5_SUM" ] ; then
+      /usr/bin/echo "md5sum from ${FILENAME%.*} BAD"
+      if [ ! -d /var/mos ] ; then
+        /usr/bin/mkdir -p /var/mos
+      fi
+      /usr/bin/echo "${FILENAME%.*}" >> /var/mos/badfiles
+      MD5_BAD="true"
+    else
+      /usr/bin/echo "md5sum from ${FILENAME%.*} OK"
+    fi
+  done
+  
+  if [ "$MD5_BAD" = "true" ] ; then
+    /usr/bin/echo "ERROR: .md5 check returned errors, please check your installation"
+    /usr/bin/echo "       Trying to continue with boot..."
+  else
+    /usr/bin/echo "Finished .md5 check sucessful"
+  fi
+fi
+
 # Execute boot script
 if [ -f /boot/optional/scripts/boot.sh ] ; then
   /bin/cp /boot/optional/scripts/boot.sh /tmp/boot.sh
