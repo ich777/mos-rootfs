@@ -365,13 +365,18 @@ start_zram_swap() {
       ZRAM_SWAP=$(echo "$ZRAM_JSON" | jq -r '.devices[] | select(.type == "swap") | .index // ""')
       for swap in $ZRAM_SWAP
       do
-        SWAP_JSON=$(echo "$ZRAM_JSON" | jq -r --arg index "$swap" '.devices[] | select(.index == ($index | tonumber))')
-        SWAP_INDEX=$(echo "$SWAP_JSON" | jq -r '.index')
-        SWAP_ALGORITHM=$(echo "$SWAP_JSON" | jq -r '.algorithm')
-        SWAP_PRIORITY=$(echo "$SWAP_JSON" | jq -r '.config.priority // "-2"')
-        mkswap "/dev/zram${SWAP_INDEX}" >/dev/null 2>&1
-        swapon --priority "$SWAP_PRIORITY" "/dev/zram${SWAP_INDEX}" >/dev/null 2>&1
-        echo $SWAP_INDEX $SWAP_ALGORITHM $SWAP_PRIORITY
+        ZSWAP_JSON=$(echo "$ZRAM_JSON" | jq -r --arg index "$swap" '.devices[] | select(.index == ($index | tonumber))')
+        ZSWAP_ENABLED=$(echo "$ZSWAP_JSON" | jq -r '.enabled')
+        [ "$ZSWAP_ENABLED" != "true" ] && \
+          continue
+        ZSWAP_INDEX=$(echo "$ZSWAP_JSON" | jq -r '.index')
+        ZSWAP_ALGORITHM=$(echo "$ZSWAP_JSON" | jq -r '.algorithm')
+        ZSWAP_SIZE=$(echo "$ZSWAP_JSON" | jq -r '.size')
+        ZSWAP_PRIORITY=$(echo "$ZSWAP_JSON" | jq -r '.config.priority // "-2"')
+        zramctl /dev/zram${ZSWAP_INDEX} --algorithm ${ZSWAP_ALGORITHM} --size ${ZSWAP_SIZE}
+        mkswap "/dev/zram${ZSWAP_INDEX}" >/dev/null 2>&1
+        swapon --priority "$ZSWAP_PRIORITY" "/dev/zram${ZSWAP_INDEX}" >/dev/null 2>&1
+        echo $ZSWAP_INDEX $ZSWAP_ALGORITHM $ZSWAP_PRIORITY
       done
     fi
   fi
