@@ -58,6 +58,9 @@ if [ -z "$BOOT_FS_TYPE" ] ; then
 elif [ "$BOOT_FS_TYPE" = "vfat" ] ; then
   /bin/mount -v -t vfat -o rw,flush,noatime,nodiratime,dmask=77,fmask=177,shortname=mixed $BOOT_DEVICE /boot || { /bin/echo "ERROR: Can't mount device: $BOOT_DEVICE"; /bin/sleep infinity; }
   /bin/echo "$BOOT_DEVICE mounted"
+  /bin/echo "Running fsck.vfat on $BOOT_DEVCE"
+  /usr/sbin/fsck.vfat $BOOT_DEVICE -y >/dev/null 2>&1
+  /bin/echo "fsck.vfat done"
 elif [ "$BOOT_FS_TYPE" = "ext4" ] ; then
   /bin/mount -v -t ext4 -o rw,noatime,discard $BOOT_DEVICE /boot || { /bin/echo "ERROR: Can't mount device: $BOOT_DEVICE"; /bin/sleep infinity; }
   /bin/echo "$BOOT_DEVICE mounted"
