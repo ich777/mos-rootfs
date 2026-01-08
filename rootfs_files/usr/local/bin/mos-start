@@ -225,6 +225,14 @@ start_samba() {
   fi
 }
 
+# Start NFS service if enabled
+start_nfs() {
+  NFS_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.nfs.enabled')
+  if [ "$NFS_ENABLED" = "true" ] ; then
+    /etc/init.d/nfs-kernel-server start
+  fi
+}
+
 # Start Tailscale service if enabled
 start_tailscale() {
   TAILSCALE_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.tailscale.enabled')
@@ -440,6 +448,7 @@ if [ "$1" = "os" ] ; then
   start_nut
   start_nmbd
   start_samba
+  start_nfs
   start_docker
   docker_network_check
   docker_autostart
