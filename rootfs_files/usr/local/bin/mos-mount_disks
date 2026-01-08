@@ -17,6 +17,28 @@ else
   POOLS="$1"
 fi
 
+# Check if ZRAM is enabled and has ramdisk devices enabled
+ZRAM_JSON=$(jq '.' /boot/config/system/zram.json 2>/dev/null)
+ZRAM_RAMDISKS=$(echo "$ZRAM_JSON" | jq -r '.enabled and ([.devices[] | select(.type == "ramdisk" and .enabled == true)] | length > 0)')
+if [ "$ZRAM_RAMDISKS" == "true" ] ; then
+  ZRAM_RAMDISKS=$(echo "$ZRAM_JSON" | jq -r '.devices[] | select(.type == "ramdisk")')
+fi
+
+# UUID check
+uuid_check() {
+  if [ -e "/dev/disk/by-uuid/$1" ]; then
+    echo "/dev/disk/by-uuid/$1"
+  else
+    ZRAM_RAMDISK_JSON=$(echo "$ZRAM_JSON" | jq --arg uuid "$1" '(.devices[] | select(.config.uuid == $uuid)) // empty')
+    if [ ! -z "$ZRAM_RAMDISK_JSON" ] ; then
+      ZRAM_RAMDISK_INDEX=$(echo "$ZRAM_RAMDISK_JSON" | jq -r '.index')
+      echo "/dev/zram${ZRAM_RAMDISK_INDEX}"
+    else
+      echo ""
+    fi
+  fi
+}
+
 # Create pool directory and mergerfs mount when pool is mergerfs
 create_pool_directory() {
   if [ "$(mount | grep "/mnt/$1")" ] ; then
@@ -47,7 +69,7 @@ mergerfs_mount_disk() {
       DEVICE_PATH="/dev/nmd${4}p1"
       MOUNT_OPTIONS="-o nodiscard"
     else
-      DEVICE_PATH="/dev/disk/by-uuid/$2"
+      DEVICE_PATH="$(uuid_check $2)"
     fi
     if [ "$5" == "true" ] ; then
       if [ ! -z "$6" ] ; then
@@ -128,7 +150,8 @@ btrfs_mount_pool() {
   if [ "$3" == "true" ] ; then
     mount -t btrfs $MOUNT_OPTIONS ${1}/${2}_1 /mnt/$2
   else
-    mount -t btrfs $MOUNT_OPTIONS /dev/disk/by-uuid/$1 /mnt/$2
+    DEVICE_PATH="$(uuid_check $1)"
+    mount -t btrfs $MOUNT_OPTIONS $DEVICE_PATH /mnt/$2
   fi
 }
 
@@ -148,7 +171,8 @@ ext4_mount_disk() {
     fi
     mount -t ext4 $MOUNT_OPTIONS /dev/mapper/${2}_1 /mnt/$2
   else
-    mount -t ext4 $MOUNT_OPTIONS /dev/disk/by-uuid/$1 /mnt/$2
+    DEVICE_PATH="$(uuid_check $1)"
+    mount -t ext4 $MOUNT_OPTIONS $DEVICE_PATH /mnt/$2
   fi
 }
 
@@ -168,7 +192,8 @@ xfs_mount_disk() {
     fi
     mount -t xfs $MOUNT_OPTIONS /dev/mapper/${2}_1 /mnt/$2
   else
-    mount -t xfs $MOUNT_OPTIONS /dev/disk/by-uuid/$1 /mnt/$2
+    DEVICE_PATH="$(uuid_check $1)"
+    mount -t xfs $MOUNT_OPTIONS $DEVICE_PATH /mnt/$2
   fi
 }
 
