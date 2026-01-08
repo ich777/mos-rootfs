@@ -355,28 +355,60 @@ start_swap() {
   fi
 }
 
-# zram swap
-start_zram_swap() {
+# Format function for zram ramdisks
+format_zram_ramdisk() {
+  if [ "$1" = "ext4" ] ; then
+    mkfs.ext4 -F -U $2 $3 >/dev/null 2>&1
+  elif [ "$1" = "xfs" ] ; then
+    mkfs.xfs -f -m uuid=$2 $3 >/dev/null 2>&1
+  elif [ "$1" = "btrfs" ] ; then
+    mkfs.btrfs -f -U $2 $3 >/dev/null 2>&1
+  else
+    return 1
+  fi
+}
+
+# zram swap/ramdisk
+start_zram() {
   ZRAM=$(echo $ZRAM_JSON | jq -r '.enabled')
   if [ "$ZRAM" = "true" ] ; then
     ZRAM_DEVICES=$(echo $ZRAM_JSON | jq -r '.zram_devices')
     if [ "$ZRAM_DEVICES" -gt "0" ] ; then
       modprobe zram num_devices=$ZRAM_DEVICES
       ZRAM_SWAP=$(echo "$ZRAM_JSON" | jq -r '.devices[] | select(.type == "swap") | .index // ""')
+      ZRAM_RAMDISK=$(echo "$ZRAM_JSON" | jq -r '.devices[] | select(.type == "ramdisk") | .index // ""')
       for swap in $ZRAM_SWAP
       do
-        ZSWAP_JSON=$(echo "$ZRAM_JSON" | jq -r --arg index "$swap" '.devices[] | select(.index == ($index | tonumber))')
-        ZSWAP_ENABLED=$(echo "$ZSWAP_JSON" | jq -r '.enabled')
-        [ "$ZSWAP_ENABLED" != "true" ] && \
+        ZRAM_SWAP_JSON=$(echo "$ZRAM_JSON" | jq -r --arg index "$swap" '.devices[] | select(.index == ($index | tonumber))')
+        ZRAM_SWAP_ENABLED=$(echo "$ZRAM_SWAP_JSON" | jq -r '.enabled')
+        [ "$ZRAM_SWAP_ENABLED" != "true" ] && \
           continue
-        ZSWAP_INDEX=$(echo "$ZSWAP_JSON" | jq -r '.index')
-        ZSWAP_ALGORITHM=$(echo "$ZSWAP_JSON" | jq -r '.algorithm')
-        ZSWAP_SIZE=$(echo "$ZSWAP_JSON" | jq -r '.size')
-        ZSWAP_PRIORITY=$(echo "$ZSWAP_JSON" | jq -r '.config.priority // "-2"')
-        zramctl /dev/zram${ZSWAP_INDEX} --algorithm ${ZSWAP_ALGORITHM} --size ${ZSWAP_SIZE}
-        mkswap "/dev/zram${ZSWAP_INDEX}" >/dev/null 2>&1
-        swapon --priority "$ZSWAP_PRIORITY" "/dev/zram${ZSWAP_INDEX}" >/dev/null 2>&1
-        echo $ZSWAP_INDEX $ZSWAP_ALGORITHM $ZSWAP_PRIORITY
+        ZRAM_SWAP_INDEX=$(echo "$ZRAM_SWAP_JSON" | jq -r '.index')
+        ZRAM_SWAP_ALGORITHM=$(echo "$ZRAM_SWAP_JSON" | jq -r '.algorithm')
+        ZRAM_SWAP_SIZE=$(echo "$ZRAM_SWAP_JSON" | jq -r '.size')
+        ZRAM_SWAP_PRIORITY=$(echo "$ZRAM_SWAP_JSON" | jq -r '.config.priority // "-2"')
+        zramctl /dev/zram${ZRAM_SWAP_INDEX} --algorithm ${ZRAM_SWAP_ALGORITHM} --size ${ZRAM_SWAP_SIZE}
+        mkswap "/dev/zram${ZRAM_SWAP_INDEX}" >/dev/null 2>&1
+        swapon --priority "$ZRAM_SWAP_PRIORITY" "/dev/zram${ZRAM_SWAP_INDEX}" >/dev/null 2>&1
+      done
+      for ramdisk in $ZRAM_RAMDISK
+      do
+        ZRAM_RAMDISK_JSON=$(echo "$ZRAM_JSON" | jq -r --arg index "$ramdisk" '.devices[] | select(.index == ($index | tonumber))')
+        ZRAM_RAMDISK_ENABLED=$(echo "$ZRAM_RAMDISK_JSON" | jq -r '.enabled')
+        [ "$ZRAM_RAMDISK_ENABLED" != "true" ] && \
+          continue
+        ZRAM_RAMDISK_INDEX=$(echo "$ZRAM_RAMDISK_JSON" | jq -r '.index')
+        ZRAM_RAMDISK_ALGORITHM=$(echo "$ZRAM_RAMDISK_JSON" | jq -r '.algorithm')
+        ZRAM_RAMDISK_SIZE=$(echo "$ZRAM_RAMDISK_JSON" | jq -r '.size')
+        ZRAM_RAMDISK_UUID=$(echo "$ZRAM_RAMDISK_JSON" | jq -r '.config.uuid')
+        ZRAM_RAMDISK_FILESYSTEM=$(echo "$ZRAM_RAMDISK_JSON" | jq -r '.config.filesystem')
+        zramctl /dev/zram${ZRAM_RAMDISK_INDEX} --algorithm ${ZRAM_RAMDISK_ALGORITHM} --size ${ZRAM_RAMDISK_SIZE}
+        format_zram_ramdisk "$ZRAM_RAMDISK_FILESYSTEM" "$ZRAM_RAMDISK_UUID" "/dev/zram${ZRAM_RAMDISK_INDEX}"
+        EXIT_STATUS=$?
+        if [ "$EXIT_STATUS" != "0" ] ; then
+          echo "ERROR: Format failed for zram ramdisk /dev/zram${$ZRAM_RAMDISK_INDEX}"
+          continue
+        fi
       done
     fi
   fi
@@ -399,11 +431,11 @@ if [ "$1" = "os" ] ; then
   start_tailscale
   start_netbird
   start_iscsi_initiator
+  start_zram
   mount_disks
   start_iscsi_target
   mount_remotes
   start_swap
-  start_zram_swap
   optional_packages
   start_nut
   start_nmbd
