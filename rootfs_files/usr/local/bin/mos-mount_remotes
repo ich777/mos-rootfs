@@ -98,7 +98,7 @@ for remote_name in $REMOTES; do
         rmdir /mnt/remotes/${server}/${share}
       fi
     elif [ "$type" = "nfs" ] ; then
-      NFS_OPTIONS="vers=4,rsize=1048576,wsize=1048576,hard,intr,timeo=600"
+      NFS_OPTIONS="vers=4"
 
       [ "$uid" != "null" ] && \
         NFS_OPTIONS="$NFS_OPTIONS,uid=${uid}"
