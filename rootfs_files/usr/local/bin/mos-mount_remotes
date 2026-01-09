@@ -1,6 +1,9 @@
 #!/bin/sh
 PATH=$PATH:/usr/local/bin
 
+# Include mos-common functions
+. /usr/local/lib/functions/mos-common
+
 # Get json and write it into variable
 REMOTES_JSON="$(cat /boot/config/remotes.json 2>/dev/null)"
 if [ -z "$1" ]; then
@@ -8,38 +11,6 @@ if [ -z "$1" ]; then
 else
   REMOTES="$1"
 fi
-
-# Get JWT_SECRET from api to decrypt passwords
-JWT_SECRET="$(cat /boot/config/api/env 2>/dev/null | grep 'JWT_SECRET' | cut -d '=' -f2)"
-
-decrypt_password() {
-  # Split password
-  IFS=':' read -r IV_HEX AUTH_TAG_HEX ENCRYPTED_DATA <<< "$1"
-
-  # Decrypt password using node
-  node -e "
-const crypto = require('crypto');
-
-const algorithm = 'aes-256-gcm';
-const key = crypto.scryptSync('$JWT_SECRET', 'remotes-salt', 32);
-const iv = Buffer.from('$IV_HEX', 'hex');
-const authTag = Buffer.from('$AUTH_TAG_HEX', 'hex');
-const encrypted = '$ENCRYPTED_DATA';
-
-try {
-    const decipher = crypto.createDecipheriv(algorithm, key, iv);
-    decipher.setAuthTag(authTag);
-    decipher.setAAD(Buffer.from('remotes-auth'));
-    
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    
-    console.log(decrypted);
-} catch (error) {
-    console.error('Decryption failed:', error.message);
-    process.exit(1);
-}"
-}
 
 # Ensure remotes directory exists
 mkdir -p /mnt/remotes
