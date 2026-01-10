@@ -73,7 +73,7 @@ start_nginx() {
   #   1 if daemon was already running
   #   2 if daemon could not be started
 
-  mkdir -p /var/log/nginx >/dev/null 2>&1
+  mkdir -p /var/log/nginx /var/www/mos-plugins >/dev/null 2>&1
 
   start-stop-daemon --start --quiet --pidfile $PID --exec $DAEMON --test > /dev/null || return 1
   start-stop-daemon --start --quiet --pidfile $PID --exec $DAEMON -- \
