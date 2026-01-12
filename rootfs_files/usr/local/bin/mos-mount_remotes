@@ -45,7 +45,7 @@ for remote_name in $REMOTES; do
     # Check if share is smb or nfs and mount remote share
     if [ "$type" = "smb" ] ; then
       if [ "$username" != "null" ] ; then
-        DECRYPTED_PASSWORD=$(decrypt_password "${password}" "remotes")
+        DECRYPTED_PASSWORD="$(decrypt_password "${password}" "remotes")"
         SMB_OPTIONS="username=${username},password=${DECRYPTED_PASSWORD},vers=${version},iocharset=utf8,noperm"
         unset DECRYPTED_PASSWORD
       else
