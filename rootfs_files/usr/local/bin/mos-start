@@ -121,17 +121,22 @@ docker_network_create() {
     DOCKER_GATEWAY="$(echo $DOCKER_NET_CONFIG | jq -r '.[].gateway')"
   fi
 
-  docker network create -d $2 \
-  --subnet=$DOCKER_SUBNET \
-  --gateway=$DOCKER_GATEWAY \
-  -o parent=$1 \
-  $1 >/dev/null 2>&1
+  NETWORK_CREATE_OUTPUT=$(docker network create -d $2 \
+    --subnet=$DOCKER_SUBNET \
+    --gateway=$DOCKER_GATEWAY \
+    -o parent=$1 \
+    $1 2>&1)
+  EXIT_CODE=$?
+  if [ "$EXIT_CODE" != "0" ]; then
+    echo "ERROR: docker network create failed with exit code $EXIT_CODE: $NETWORK_CREATE_OUTPUT" | logger -t "MOS Docker"
+  fi
 }
 
 # Check if Docker interface for ipvlan/macvlan is already in place
 docker_network_check() {
   DOCKER_NET_MODE=$(echo $DOCKER_JSON | jq -r '.docker_net.mode')
   INTERFACE_MODE=$(echo $NETWORK_JSON | jq -r '.interfaces[] | select(.name == "eth0") | .type')
+  sleep 1
 
   if [ "$INTERFACE_MODE" = "bridged" ] ; then
     INTERFACE=br0
