@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Import MOS functions
+. /usr/local/lib/functions/mos-common
+
 # Set Kernel
 if [ ! -z "$1" ] ; then
   UNAME="$1"
@@ -13,10 +16,17 @@ mkdir -p /var/mos/mos-drivers >/dev/null 2>&1
 # Get releases:
 get_releases() {
   echo "Trying to get MOS Drivers for Kernel: $UNAME"
-  TOKEN="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"
+  GH_TOKEN=$(jq -r '.github // empty' /boot/config/system/tokens.json)
+  if [ ! -z "$GH_TOKEN" ] ; then
+    TOKEN="$(decrypt_password "$GH_TOKEN" "tokens")"
+    HEADER=(--header "Authorization: Bearer $TOKEN")
+  else
+    HEADER=()
+  fi
+
   curl -s --request GET \
     --url "https://api.github.com/repos/ich777/mos-addon-drivers/releases/tags/$UNAME" \
-    --header "Authorization: Bearer $TOKEN" \
+    "${HEADER[@]}" \
     --header "X-GitHub-Api-Version: 2022-11-28" \
     -o /var/mos/mos-drivers/drivers-$UNAME.json
   EXIT_STATUS=$?
