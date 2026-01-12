@@ -401,6 +401,7 @@ if [[ "$UPDATE" = "true" ]] ; then
   docker images "${repo%:*}" -f "dangling=true" -q | xargs docker rmi >/dev/null 2>&1
 fi
 
+# Remove DOCKER_CONFIG and config.json
 if [ "$2" != "update_container" ] ; then
   if [ -f /var/mos/docker-auth/config.json ] ; then
     rm -f /var/mos/docker-auth/config.json
