@@ -1,16 +1,27 @@
 #!/bin/sh
 
+# Import MOS functions
+. /usr/local/lib/functions/mos-common
+
 # Create directory
 mkdir -p /var/mos/mos-update >/dev/null 2>&1
 
 # Get last 50 releases:
 get_releases() {
   echo "Trying to get MOS releases"
-  TOKEN="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"
+
+  GH_TOKEN=$(jq -r '.github // empty' /boot/config/system/tokens.json)
+  if [ ! -z "$GH_TOKEN" ] ; then
+    TOKEN="$(decrypt_password "$GH_TOKEN" "tokens")"
+    HEADER=(--header "Authorization: Bearer $TOKEN")
+  else
+    HEADER=()
+  fi
+
   curl -s --request GET \
-    --url "https://api.github.com/repos/ich777/mos-rootfs/releases?per_page=50" \
-    --header "Authorization: Bearer $TOKEN" \
-    --header "X-GitHub-Api-Version: 2022-11-28" \
+    --url 'https://api.github.com/repos/ich777/mos-rootfs/releases?per_page=50' \
+    "${HEADER[@]}" \
+    --header 'X-GitHub-Api-Version: 2022-11-28' \
     -o /var/mos/mos-update/releases.json
   EXIT_STATUS=$?
   if [ "$EXIT_STATUS" != "0" ] ; then
