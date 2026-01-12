@@ -1,10 +1,10 @@
 #!/bin/bash
 # Check if argument was passed over and if the argument
 # is a file in the current directory
-if [[ -z "$1" ]]; then
+if [[ -z "$1" ]] ; then
   echo "ERROR: You must pass over a filename to a container json"
   exit 1
-elif [[ ! -f "$1" ]]; then
+elif [[ ! -f "$1" ]] ; then
   echo "ERROR: $1 is not a file"
   exit 1
 fi
@@ -13,7 +13,7 @@ fi
 config=$(cat "$1")
 
 # Validate JSON
-if ! echo "$config" | jq empty 2>/dev/null; then
+if ! echo "$config" | jq empty 2>/dev/null ; then
   echo "ERROR: Invalid JSON in configuration file"
   exit 1
 fi
@@ -22,20 +22,52 @@ UPDATE=false
 RECREATE=false
 
 # Check if second argument was passed over and set values in variables
-if [[ "$2" = "override_appdata" ]]; then
+if [[ "$2" = "override_appdata" ]] ; then
   appdata_path=$(jq -r '.appdata' /boot/config/docker.json)
-elif [[ "$2" = "update_container" ]]; then
+elif [[ "$2" = "update_container" ]] ; then
   UPDATE=true
   appdata_path=""
-elif [[ "$2" = "recreate_container" ]]; then
+elif [[ "$2" = "recreate_container" ]] ; then
   RECREATE=true
 else
   appdata_path=""
 fi
 
+# Set DOCKER_CONFIG if tokens are presend
+if [ "$2" != "update_container" ] ; then
+  # Import MOS functions
+  . /usr/local/lib/functions/mos-common
+
+  GH_TOKEN=$(jq -r '.github // empty' /boot/config/system/tokens.json)
+  DOCKER_TOKEN=$(jq -r '.dockerhub // empty' /boot/config/system/tokens.json)
+
+  if [[ -z "$GH_TOKEN" && -z "$DOCKER_TOKEN" ]] ; then
+    unset DOCKER_CONFIG
+  else
+    CONFIG_JSON='{"auths":{}}'
+    if [ ! -z "$GH_TOKEN" ] ; then
+      GHTOKEN="$(decrypt_password "$GH_TOKEN" "tokens")"
+      GHAUTH=$(echo -n "_:$GHTOKEN" | base64 -w0)
+      CONFIG_JSON=$(echo "$CONFIG_JSON" | jq --arg auth "$GHAUTH" \
+        '.auths["ghcr.io"] = {auth: $auth}')
+    fi
+    if [ ! -z "$DOCKER_TOKEN" ] ; then
+      DOCKERTOKEN="$(decrypt_password "$DOCKER_TOKEN" "tokens")"
+      DOCKERAUTH=$(echo -n "$DOCKERTOKEN" | base64 -w0)
+      CONFIG_JSON=$(echo "$CONFIG_JSON" | jq --arg auth "$DOCKERAUTH" \
+        '.auths["https://index.docker.io/v1/"] = {auth: $auth}')
+    fi
+    if [ ! -d /var/mos/docker-auth ] ; then
+      mkdir -p /var/mos/docker-auth
+    fi
+    echo "$CONFIG_JSON" > "/var/mos/docker-auth/config.json"
+    export DOCKER_CONFIG="/var/mos/docker-auth"
+  fi
+fi
+
 # Get timezone
 timezone=$(jq -r '.timezone' /boot/config/system.json)
-if [[ -z "$timezone" || "$timezone" = "null" ]]; then
+if [[ -z "$timezone" || "$timezone" = "null" ]] ; then
   timezone="UTC"
 fi
 
@@ -44,12 +76,12 @@ name=$(echo "$config" | jq -r '.name')
 repo=$(echo "$config" | jq -r '.repo')
 
 # Validate critical fields
-if [[ -z "$name" || "$name" = "null" ]]; then
+if [[ -z "$name" || "$name" = "null" ]] ; then
   echo "ERROR: Container name is missing or invalid"
   exit 1
 fi
 
-if [[ -z "$repo" || "$repo" = "null" ]]; then
+if [[ -z "$repo" || "$repo" = "null" ]] ; then
   echo "ERROR: Container repository is missing or invalid"
   exit 1
 fi
@@ -63,8 +95,8 @@ post_parameters=$(echo "$config" | jq -r '.post_parameters // ""')
 cpu_set=$(echo "$config" | jq -r '.cpu_set // empty')
 
 # Check if this is an update/recreation and if container is running
-if [[ "$UPDATE" = "true" ]] || [[ "$RECREATE" = "true" ]]; then
-  if [[ "$(docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null)" = "true" ]]; then
+if [[ "$UPDATE" = "true" ]] || [[ "$RECREATE" = "true" ]] ; then
+  if [[ "$(docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null)" = "true" ]] ; then
     docker_cmd=(docker run -d)
   else
     docker_cmd=(docker create)
@@ -77,19 +109,19 @@ fi
 docker_cmd+=(--name "$name")
 
 # Add values to docker_cmd
-if [[ "$network" != "null" && -n "$network" ]]; then
+if [[ "$network" != "null" && -n "$network" ]] ; then
   docker_cmd+=(--network "$network")
 fi
 
-if [[ "$custom_ip" != "null" && -n "$custom_ip" ]]; then
+if [[ "$custom_ip" != "null" && -n "$custom_ip" ]] ; then
   docker_cmd+=(--ip "$custom_ip")
 fi
 
-if [[ "$privileged" = "true" ]]; then
+if [[ "$privileged" = "true" ]] ; then
   docker_cmd+=(--privileged)
 fi
 
-if [[ "$cpu_set" != "null" && -n "$cpu_set" ]]; then
+if [[ "$cpu_set" != "null" && -n "$cpu_set" ]] ; then
   docker_cmd+=(--cpuset-cpus "$cpu_set")
 fi
 
@@ -100,13 +132,13 @@ case "$network" in
   ;;
   *)
     ports_json=$(echo "$config" | jq -c '.ports[]?' 2>/dev/null)
-    if [[ -n "$ports_json" ]]; then
-      while IFS= read -r i; do
+    if [[ -n "$ports_json" ]] ; then
+      while IFS= read -r i ; do
         host_port=$(echo "$config" | jq -r ".ports[$i].host")
         container_port=$(echo "$config" | jq -r ".ports[$i].container")
         protocol=$(echo "$config" | jq -r ".ports[$i].protocol // \"tcp\"")
 
-        if [[ "$host_port" != "null" && "$container_port" != "null" ]]; then
+        if [[ "$host_port" != "null" && "$container_port" != "null" ]] ; then
           docker_cmd+=(-p "${host_port}:${container_port}/${protocol}")
         fi
       done < <(echo "$config" | jq -r '.ports | keys[]' 2>/dev/null)
@@ -116,28 +148,28 @@ esac
 
 # Loop through paths and add them to docker_cmd
 paths_count=$(echo "$config" | jq -r '.paths | length' 2>/dev/null)
-if [[ "$paths_count" != "null" && "$paths_count" != "0" ]]; then
-  while IFS= read -r i; do
+if [[ "$paths_count" != "null" && "$paths_count" != "0" ]] ; then
+  while IFS= read -r i ; do
     host_path=$(echo "$config" | jq -r ".paths[$i].host")
     container_path=$(echo "$config" | jq -r ".paths[$i].container")
     mode_path=$(echo "$config" | jq -r ".paths[$i].mode")
 
-    if [[ "$host_path" != "null" && "$container_path" != "null" ]]; then
-      if [[ -n "$appdata_path" && "$appdata_path" != "null" && "${host_path#*/appdata/}" != "$host_path" ]]; then
+    if [[ "$host_path" != "null" && "$container_path" != "null" ]] ; then
+      if [[ -n "$appdata_path" && "$appdata_path" != "null" && "${host_path#*/appdata/}" != "$host_path" ]] ; then
         host_path=${appdata_path%/}/${host_path#*/appdata/}
       fi
-      if [[ -f "$host_path" ]]; then
+      if [[ -f "$host_path" ]] ; then
         echo "INFO: $host_path is a file on the host."
-      elif [[ -S "$host_path" ]]; then
+      elif [[ -S "$host_path" ]] ; then
         echo "INFO: $host_path is a socket on the host."
-      elif [[ ! -d "$host_path" ]]; then
-        if ! mkdir -p "$host_path" 2>/dev/null; then
+      elif [[ ! -d "$host_path" ]] ; then
+        if ! mkdir -p "$host_path" 2>/dev/null ; then
           echo "WARNING: Failed to create directory $host_path, skipping volume mount"
           continue
         fi
       fi
 
-      if [[ -n "$mode_path" && "$mode_path" != "null" ]]; then
+      if [[ -n "$mode_path" && "$mode_path" != "null" ]] ; then
         docker_cmd+=(-v "${host_path}:${container_path}:${mode_path}")
       else
         docker_cmd+=(-v "${host_path}:${container_path}")
@@ -148,12 +180,12 @@ fi
 
 # Loop through variables and add them to docker_cmd
 variables_count=$(echo "$config" | jq -r '.variables | length' 2>/dev/null)
-if [[ "$variables_count" != "null" && "$variables_count" != "0" ]]; then
-  while IFS= read -r i; do
+if [[ "$variables_count" != "null" && "$variables_count" != "0" ]] ; then
+  while IFS= read -r i ; do
     key=$(echo "$config" | jq -r ".variables[$i].key")
     value=$(echo "$config" | jq -r ".variables[$i].value")
 
-    if [[ "$key" != "null" && "$value" != "null" ]]; then
+    if [[ "$key" != "null" && "$value" != "null" ]] ; then
       docker_cmd+=(-e "${key}=${value}")
     fi
   done < <(echo "$config" | jq -r '.variables | keys[]' 2>/dev/null)
@@ -165,13 +197,13 @@ docker_cmd+=(-e "TZ=${timezone}")
 declare -A nvidia_uuids
 gpu_extra_parameters=""
 gpus_json=$(echo "$config" | jq -c '.gpus[]?' 2>/dev/null)
-if [[ -n "$gpus_json" ]]; then
+if [[ -n "$gpus_json" ]] ; then
   avail_gpus="$(/usr/local/bin/mos-get_gpus)"
-  while IFS= read -r i; do
+  while IFS= read -r i ; do
     gpu_json=$(echo "$avail_gpus" | jq --arg pciid "$i" '.. | objects | select(.pci== $pciid )')
     gpu_vendor=$(echo "$gpu_json" | jq -r '.vendor')
-    if [[ "$gpu_vendor" != "null" && -n "$gpu_vendor" ]]; then
-      if [[ "$gpu_vendor" = "NVIDIA" ]]; then
+    if [[ "$gpu_vendor" != "null" && -n "$gpu_vendor" ]] ; then
+      if [[ "$gpu_vendor" = "NVIDIA" ]] ; then
         [[ -z "$gpu_extra_parameters" ]] && gpu_extra_parameters="--runtime=nvidia"
         gpu_uuid=$(echo "$gpu_json" | jq -r '.uuid')
         nvidia_uuids["$gpu_uuid"]=1
@@ -187,7 +219,7 @@ if [[ -n "$gpus_json" ]]; then
   done < <(echo "$config" | jq -r '.gpus[]' 2>/dev/null)
 
   # Add NVIDIA UUIDs if any were found
-  if [[ ${#nvidia_uuids[@]} -gt 0 ]]; then
+  if [[ ${#nvidia_uuids[@]} -gt 0 ]] ; then
     nvidia_uuid_list=$(IFS=,; echo "${!nvidia_uuids[*]}")
     docker_cmd+=(-e "NVIDIA_VISIBLE_DEVICES=${nvidia_uuid_list}")
     docker_cmd+=(-e "NVIDIA_DRIVER_CAPABILITIES=all")
@@ -196,13 +228,13 @@ fi
 
 # Loop through devices and add them to docker_cmd
 devices_count=$(echo "$config" | jq -r '.devices | length' 2>/dev/null)
-if [[ "$devices_count" != "null" && "$devices_count" != "0" ]]; then
-  while IFS= read -r i; do
+if [[ "$devices_count" != "null" && "$devices_count" != "0" ]] ; then
+  while IFS= read -r i ; do
     host_device=$(echo "$config" | jq -r ".devices[$i].host")
     container_device=$(echo "$config" | jq -r ".devices[$i].container")
 
-    if [[ "$host_device" != "null" && "$container_device" != "null" ]]; then
-      if [[ -e "$host_device" ]]; then
+    if [[ "$host_device" != "null" && "$container_device" != "null" ]] ; then
+      if [[ -e "$host_device" ]] ; then
         docker_cmd+=(--device "${host_device}:${container_device}")
       else
         echo "WARNING: $host_device doesn't exist, skipping"
@@ -213,28 +245,28 @@ fi
 
 # Loop through labels and add them to docker_cmd
 labels_count=$(echo "$config" | jq -r '.labels | length' 2>/dev/null)
-if [[ "$labels_count" != "null" && "$labels_count" != "0" ]]; then
-  while IFS= read -r i; do
+if [[ "$labels_count" != "null" && "$labels_count" != "0" ]] ; then
+  while IFS= read -r i ; do
     key=$(echo "$config" | jq -r ".labels[$i].key")
     value=$(echo "$config" | jq -r ".labels[$i].value")
 
-    if [[ "$key" != "null" && "$value" != "null" ]]; then
+    if [[ "$key" != "null" && "$value" != "null" ]] ; then
       docker_cmd+=(--label "${key}=${value}")
     fi
   done < <(echo "$config" | jq -r '.labels | keys[]' 2>/dev/null)
 fi
 docker_cmd+=(--label "mos.backend=docker")
-if [[ "$web_ui_url" != "null" && -n "$web_ui_url" ]]; then
+if [[ "$web_ui_url" != "null" && -n "$web_ui_url" ]] ; then
   web_ui_url=$(echo "$web_ui_url" | sed 's/\[IP\]/[ADDRESS]/')
   docker_cmd+=(--label "mos.webui=${web_ui_url}")
 fi
 
 # Add rest of parameters to docker_cmd
-if [[ "$gpu_extra_parameters" != "null" && -n "$gpu_extra_parameters" ]]; then
+if [[ "$gpu_extra_parameters" != "null" && -n "$gpu_extra_parameters" ]] ; then
   docker_cmd+=("$gpu_extra_parameters")
 fi
 
-if [[ "$extra_parameters" != "null" && -n "$extra_parameters" ]]; then
+if [[ "$extra_parameters" != "null" && -n "$extra_parameters" ]] ; then
   # Split extra_parameters properly - assuming they are space-separated
   read -ra extra_params_array <<< "$extra_parameters"
   docker_cmd+=("${extra_params_array[@]}")
@@ -244,7 +276,7 @@ fi
 docker_cmd+=("$repo")
 
 # Add post parameters to docker_cmd
-if [[ "$post_parameters" != "null" && -n "$post_parameters" ]]; then
+if [[ "$post_parameters" != "null" && -n "$post_parameters" ]] ; then
   # Split post_parameters properly - assuming they are space-separated
   readarray -t post_params_array < <(xargs -n1 <<< "$post_parameters")
   docker_cmd+=("${post_params_array[@]}")
@@ -252,20 +284,20 @@ fi
 
 # Check if this is update/recreate to determine if removal
 # of container and layers is necessary
-if [[ "$UPDATE" = "true" ]]; then
+if [[ "$UPDATE" = "true" ]] ; then
   docker pull "$repo"
   ES=$?
-  if [[ "$ES" != "0" ]]; then
+  if [[ "$ES" != "0" ]] ; then
     echo "ERROR: Can't pull new image"
     exit 1
   fi
   docker container stop "$name" >/dev/null 2>&1
   docker container rm "$name" >/dev/null 2>&1
-elif [[ "$RECREATE" = "true" ]]; then
+elif [[ "$RECREATE" = "true" ]] ; then
   docker container stop "$name" >/dev/null 2>&1
   docker container rm "$name" >/dev/null 2>&1
 else
-  if docker ps -a --format '{{.Names}}' | grep -q "^${name}$"; then
+  if docker ps -a --format '{{.Names}}' | grep -q "^${name}$" ; then
     echo "ERROR: Container: $name already exists!"
     exit 1
   fi
@@ -273,7 +305,7 @@ fi
 
 # Set/get index from container for containers file
 INDEX=$(jq -r 'keys[] | select(test("^[0-9]+$")) | tonumber' /var/lib/docker/mos/containers 2>/dev/null)
-if [[ -z "$INDEX" || "$INDEX" = "null" ]]; then
+if [[ -z "$INDEX" || "$INDEX" = "null" ]] ; then
   INDEX=1
 else
   INDEX=$((INDEX + 1))
@@ -314,20 +346,20 @@ jq --arg name "$name" \
    ' /var/lib/docker/mos/containers > /var/lib/docker/mos/containers.tmp && mv /var/lib/docker/mos/containers.tmp /var/lib/docker/mos/containers
 
 # Create icon directories
-if [[ ! -d /var/lib/docker/mos/icons ]]; then
+if [[ ! -d /var/lib/docker/mos/icons ]] ; then
   mkdir /var/lib/docker/mos/icons
 fi
-if [[ ! -d /var/www/docker_icons ]]; then
+if [[ ! -d /var/www/docker_icons ]] ; then
   mkdir /var/www/docker_icons
 fi
 
 # Download/Update icon depending on mode and if icon is set
 icon=$(echo "$config" | jq -r '.icon // null')
-if [[ "$icon" != "null" && -n "$icon" ]]; then
-  if [[ "$UPDATE" != "true" && "$RECREATE" != "true" ]]; then
+if [[ "$icon" != "null" && -n "$icon" ]] ; then
+  if [[ "$UPDATE" != "true" && "$RECREATE" != "true" ]] ; then
     wget -q -O "/var/lib/docker/mos/icons/$name.png" "$icon"
     ES=$?
-    if [[ "$ES" != 0 ]]; then
+    if [[ "$ES" != 0 ]] ; then
       rm -f "/var/lib/docker/mos/icons/$name.png"
     else
       cp "/var/lib/docker/mos/icons/$name.png" "/var/www/docker_icons/$name.png" 2>/dev/null
@@ -335,7 +367,7 @@ if [[ "$icon" != "null" && -n "$icon" ]]; then
   else
     wget -q -O "/var/lib/docker/mos/icons/tmp-$name.png" "$icon"
     ES=$?
-    if [[ "$ES" != 0 ]]; then
+    if [[ "$ES" != 0 ]] ; then
       rm -f "/var/lib/docker/mos/icons/tmp-$name.png"
     else
       mv "/var/lib/docker/mos/icons/tmp-$name.png" "/var/lib/docker/mos/icons/$name.png" 2>/dev/null
@@ -344,18 +376,18 @@ if [[ "$icon" != "null" && -n "$icon" ]]; then
   fi
 fi
 
-if [[ ! -d /boot/config/system/docker/templates ]]; then
+if [[ ! -d /boot/config/system/docker/templates ]] ; then
   mkdir -p /boot/config/system/docker/templates
 fi
 
-if [[ "$UPDATE" != "true" ]]; then
-  if [[ "$(pwd)" != "/boot/config/system/docker/templates" ]]; then
+if [[ "$UPDATE" != "true" ]] ; then
+  if [[ "$(pwd)" != "/boot/config/system/docker/templates" ]] ; then
     cp "$(pwd)/$1" "/boot/config/system/docker/templates/$name.json" 2>/dev/null
   fi
 fi
 
 # Create container or exit on error
-if ! "${docker_cmd[@]}"; then
+if ! "${docker_cmd[@]}" ; then
   echo "Error creating container: $name"
   echo -e "\n${docker_cmd[@]}"
   exit 1
@@ -365,6 +397,13 @@ fi
 echo -e "\n${docker_cmd[@]}"
 
 # Remove all dangling images from the deployed container repo (leftovers)
-if [[ "$UPDATE" = "true" ]]; then
+if [[ "$UPDATE" = "true" ]] ; then
   docker images "${repo%:*}" -f "dangling=true" -q | xargs docker rmi >/dev/null 2>&1
+fi
+
+if [ "$2" != "update_container" ] ; then
+  if [ -f /var/mos/docker-auth/config.json ] ; then
+    rm -f /var/mos/docker-auth/config.json
+  fi
+  unset DOCKER_CONFIG
 fi
