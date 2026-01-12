@@ -126,7 +126,21 @@ do
   fi
 
   # Get remote SHA
-  REMOTE_SHA=$(image-sha $IMAGE)
+  case "$REPO" in
+    ghcr.io*)
+      REMOTE_SHA=$(image-sha $GHAUTH $IMAGE)
+      ;;
+    docker.io*|http*://docker.io*|index.docker.io*)
+      REMOTE_SHA=$(image-sha $DOCKERAUTH $IMAGE)
+      ;;
+    http://*|https://*|localhost*|*.*/*|[0-9]*.[0-9]*)
+      REMOTE_SHA=$(image-sha $IMAGE)
+      ;;
+    *)
+      REMOTE_SHA=$(image-sha $DOCKERAUTH $IMAGE)    
+      ;;
+  esac
+
   REMOTE_SHA=$(echo "$REMOTE_SHA" | head -1)
 
   # Safety check if remote SHA is valid
