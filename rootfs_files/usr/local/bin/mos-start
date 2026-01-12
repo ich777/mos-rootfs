@@ -114,8 +114,8 @@ docker_network_create() {
   DOCKER_NET_CONFIG=$(echo $DOCKER_JSON | jq -r '.docker_net.config')
 
   if [ "$(echo $DOCKER_NET_CONFIG | jq '. | length')" = "0" ] ; then
-    DOCKER_SUBNET="$(ip route show dev $1 | awk '/src/ {print $1}')"
-    DOCKER_GATEWAY="$(ip route show default 0.0.0.0/0 dev $1 | awk '{print $3}')"
+    DOCKER_SUBNET="$(ip route show dev $1 | awk '/src/ {print $1}' | head -1)"
+    DOCKER_GATEWAY="$(ip route show default 0.0.0.0/0 dev $1 | awk '{print $3}' | head -1)"
   else
     DOCKER_SUBNET="$(echo $DOCKER_NET_CONFIG | jq -r '.[].subnet')"
     DOCKER_GATEWAY="$(echo $DOCKER_NET_CONFIG | jq -r '.[].gateway')"
@@ -132,37 +132,34 @@ docker_network_create() {
 docker_network_check() {
   DOCKER_NET_MODE=$(echo $DOCKER_JSON | jq -r '.docker_net.mode')
   INTERFACE_MODE=$(echo $NETWORK_JSON | jq -r '.interfaces[] | select(.name == "eth0") | .type')
+
   if [ "$INTERFACE_MODE" = "bridged" ] ; then
     INTERFACE=br0
+    WRONG_INTERFACE=eth0
   else
     INTERFACE=eth0
+    WRONG_INTERFACE=br0
   fi
-  # Check for Docker networks where the parent is non existent
-  if [ "$INTERFACE" = "br0" ] ; then
-    if docker network inspect eth0 >/dev/null 2>&1; then
-      docker network rm --force eth0 >/dev/null 2>&1
-      docker_network_create "$INTERFACE" "$DOCKER_NET_MODE"
-    fi
-  else
-    if docker network inspect br0 >/dev/null 2>&1; then
-      docker network rm --force br0 >/dev/null 2>&1
-      docker_network_create "$INTERFACE" "$DOCKER_NET_MODE"
-    fi
+
+  # Remove the wrong interface network - using network ID to avoid corrupted state issues
+  WRONG_NET_ID=$(docker network ls --format '{{.ID}} {{.Name}}' | grep " $WRONG_INTERFACE$" | awk '{print $1}')
+  if [ ! -z "$WRONG_NET_ID" ] ; then
+    docker network rm --force "$WRONG_NET_ID" >/dev/null 2>&1
   fi
-  # Check for Docker networks with wrong net_mode
-  if [ "$DOCKER_NET_MODE" = "ipvlan" ] ; then
-    if [ "$(docker network inspect $1 >/dev/null 2>&1 | jq -r '.[].Driver')" = "macvlan" ] ; then
-      docker network rm --force $1 >/dev/null 2>&1
-      docker_network_create "$INTERFACE" "$DOCKER_NET_MODE"
-    fi
-  elif [ "$DOCKER_NET_MODE" = "macvlan" ] ; then
-    if [ "$(docker network inspect $1 >/dev/null 2>&1 | jq -r '.[].Driver')" = "ipvlan" ] ; then
-      docker network rm --force $1 >/dev/null 2>&1
-      docker_network_create "$INTERFACE" "$DOCKER_NET_MODE"
+  docker network rm --force "$WRONG_INTERFACE" >/dev/null 2>&1
+
+  # Check if correct interface exists with wrong driver and remove it
+  if docker network inspect "$INTERFACE" >/dev/null 2>&1 ; then
+    CURRENT_DRIVER=$(docker network inspect "$INTERFACE" 2>/dev/null | jq -r '.[].Driver')
+    if [ "$DOCKER_NET_MODE" = "ipvlan" ] && [ "$CURRENT_DRIVER" = "macvlan" ] ; then
+      docker network rm --force "$INTERFACE" >/dev/null 2>&1
+    elif [ "$DOCKER_NET_MODE" = "macvlan" ] && [ "$CURRENT_DRIVER" = "ipvlan" ] ; then
+      docker network rm --force "$INTERFACE" >/dev/null 2>&1
     fi
   fi
-  # Create Docker network if it not exists
-  if ! docker network inspect $1 >/dev/null 2>&1; then
+
+  # Create network if it doesn't exist
+  if ! docker network inspect "$INTERFACE" >/dev/null 2>&1; then
     docker_network_create "$INTERFACE" "$DOCKER_NET_MODE"
   fi
 }
