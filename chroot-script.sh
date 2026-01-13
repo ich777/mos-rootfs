@@ -140,8 +140,9 @@ chown -R root:root /tmp/rootfs_files
 chmod -R 755 /tmp/rootfs_files
 cp -R /tmp/rootfs_files/* /
 
-# Create MOS temp directory
+# Create MOS temp directory & plugins directory
 mkdir -p /var/mos
+mkdir -p /usr/bin/mos
 
 # Make sure to make mos-install not executable
 chmod -x /usr/local/bin/mos-install
