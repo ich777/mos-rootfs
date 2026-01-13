@@ -50,7 +50,8 @@ mos_update_frontend() {
   FRONTEND_ASSET_ID=$(echo $FRONTEND_JSON | jq -r '.assets[] | select(.name | startswith("mos-frontend") and endswith(".tar.gz")) | .id')
 
   # Remove WebUI
-  rm -rf /var/www/assets /var/www/index.html /var/www/mos* 2>/dev/null
+  rm -rf /var/www/assets /var/www/index.html 2>/dev/null
+  find /var/www -maxdepth 1 -type f -name "mos*" -delete
 
   # Download and extract new WebUI
   curl --progress-bar -L \
