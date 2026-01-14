@@ -301,7 +301,19 @@ echo "Moving files into place, please wait"
 mv /var/mos/mos-update/update/rootfs* /boot/
 if [ "$UPDATE_KERNEL" = "true" ] ; then
   mv /var/mos/mos-update/update/image* /var/mos/mos-update/update/drivers* /boot/
-  /usr/local/bin/mos-driver_download "update" "$KERNEL" "$4"
+
+  # Driver plugin update routine
+  for plugin in /boot/optional/plugins/*; do
+    VERSION_PATH=$(ls -d $plugin/*/ 2>/dev/null | sort -V | tail -1)
+    if [ -f "$VERSION_PATH/functions" ] ; then
+      (
+        source $VERSION_PATH/functions
+        if type mos-osupdate &>/dev/null ; then
+          mos-osupdate "$KERNEL"
+        fi
+      )
+    fi
+  done
 fi
 if [ "$UPDATE_MICROCODE" = "true" ] ; then
   mv /var/mos/mos-update/update/microcode* /boot/
