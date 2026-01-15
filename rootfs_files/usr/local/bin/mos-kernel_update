@@ -208,8 +208,8 @@ if [ "$UPDATE_KERNEL" != "false" ] ; then
     if [ -f "$VERSION_PATH/functions" ] ; then
       (
         source $VERSION_PATH/functions
-        if type mos-osupdate &>/dev/null ; then
-          mos-osupdate "$VERSION"
+        if type mos_osupdate &>/dev/null ; then
+          mos_osupdate "$VERSION"
         fi
       )
     fi
