@@ -88,13 +88,13 @@ install_plugins() {
         DEBIAN_FRONTEND=noninteractive dpkg -i $PACKAGE_PATH >/dev/null 2>&1
         INSTALLATION_DONE=true
       fi
-      # Run functions file if found (in subshell to avoid using variables from function in mos-start)
+      # Run functions file if found (in subshell to avoid using variables from function in mos_start)
       if [ -f "$VERSION_PATH/functions" ] ; then
         (
           source $VERSION_PATH/functions
-          if type mos-start &>/dev/null ; then
+          if type mos_start &>/dev/null ; then
             logger -t "MOS Plugins: $DISPLAY_NAME" "Executing start script"
-            mos-start 2>&1 | logger -t "MOS Plugins: $DISPLAY_NAME"
+            mos_start 2>&1 | logger -t "MOS Plugins: $DISPLAY_NAME"
             EXIT_STATUS=${PIPESTATUS[0]}
             if [ "$EXIT_STATUS" != "0" ] ; then
               logger -t "MOS Plugins: $DISPLAY_NAME" "ERROR: Running start script"
