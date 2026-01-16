@@ -189,6 +189,8 @@ start_docker() {
       mkdir -p $DOCKER_APPDATA
     fi
     DOCKER_OPTS="$DOCKER_OPTIONS" /etc/init.d/docker start
+    docker_network_check
+    docker_autostart
   fi
 }
 
@@ -458,8 +460,6 @@ if [ "$1" = "os" ] ; then
   start_samba
   start_nfs
   start_docker
-  docker_network_check
-  docker_autostart
   start_lxc
   start_vm
   start_nginx
@@ -476,8 +476,6 @@ if [ "$1" = "os" ] ; then
   write_run
 elif [ "$1" = "docker" ] ; then
   start_docker
-  docker_network_check
-  docker_autostart
 elif [ "$1" = "lxc" ] ; then
   start_lxc
 elif [ "$1" = "vm" ] ; then
