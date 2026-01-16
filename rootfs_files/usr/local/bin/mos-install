@@ -6,6 +6,18 @@ if [ -z "$1" ] ; then
   exit 1
 fi
 
+# Import MOS functions
+. /usr/local/lib/functions/mos-common
+
+# Set HEADER if GitHub Token was specified
+GH_TOKEN=$(jq -r '.github // empty' /boot/config/system/tokens.json)
+if [ ! -z "$GH_TOKEN" ] ; then
+  TOKEN="$(decrypt_password "$GH_TOKEN" "tokens")"
+  HEADER=(--header "Authorization: Bearer $TOKEN")
+else
+  HEADER=()
+fi
+
 # Clean Device path
 DISK="${1#/dev/}"
 DISK="/dev/$DISK"
@@ -120,7 +132,7 @@ esac
 download_asset() {
   echo "Downloading GRUB${2}"
   curl --progress-bar -L \
-  --header "Authorization: Bearer ${TOKEN}" \
+  "${HEADER[@]}" \
   --header "Accept: application/octet-stream" \
   --header "X-GitHub-Api-Version: 2022-11-28" \
   --output "/var/mos/installer/grub.deb${2}" \
@@ -137,13 +149,10 @@ download_asset() {
   fi
 }
 
-# Set Token
-TOKEN="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"
-
 # Get GRUB JSON and assets
 GRUB_JSON=$(curl -s --request GET \
   --url "https://api.github.com/repos/ich777/mos-grub/releases/latest" \
-  --header "Authorization: Bearer ${TOKEN}" \
+  "${HEADER[@]}" \
   --header "X-GitHub-Api-Version: 2022-11-28")
 
 GRUB_DEB=$(echo $GRUB_JSON | jq -r '.assets[] | select(.name | startswith("mos-grub") and endswith(".deb")) | .id')
