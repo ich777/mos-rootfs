@@ -220,10 +220,13 @@ start_vm() {
 
 # Start SAMBA network discovery services if enabled (SAMBA Discovery)
 start_samba_discovery() {
-  SAMBA_DISCOVERY_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.samba_discovery.enabled')
-  if [ "$SAMBA_DISCOVERY_ENABLED" = "true" ] ; then
-    /etc/init.d/nmbd start
-    /etc/init.d/wsddn start
+  SAMBA_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.samba.enabled')
+  if [ "$SAMBA_ENABLED" = "true" ] ; then
+    SAMBA_DISCOVERY_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.samba_discovery.enabled')
+    if [ "$SAMBA_DISCOVERY_ENABLED" = "true" ] ; then
+      /etc/init.d/nmbd start
+      /etc/init.d/wsddn start
+    fi
   fi
 }
 
