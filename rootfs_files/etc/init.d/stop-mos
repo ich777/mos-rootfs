@@ -67,6 +67,9 @@ stop_mos() {
   if [ -f /var/run/samba/nmbd.pid ] ; then
     /etc/init.d/nmbd stop
   fi
+  if [ -f /var/run/wsddn/wsddn.pid ] ; then
+    /etc/init.d/wsddn stop
+  fi
   if [ -f /var/run/samba/smbd.pid ] ; then
     /etc/init.d/smbd stop
   fi
