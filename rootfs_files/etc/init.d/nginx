@@ -27,6 +27,9 @@ test -x $DAEMON || exit 0
 . /lib/init/vars.sh
 . /lib/lsb/init-functions
 
+# Import MOS functions
+. /usr/local/lib/functions/mos-common
+
 # Try to extract nginx pidfile
 PID=$(cat /etc/nginx/nginx.conf | grep -Ev '^\s*#' | awk 'BEGIN { RS="[;{}]" } { if ($1 == "pid") print $2 }' | head -n1)
 if [ -z "$PID" ]; then
@@ -40,11 +43,19 @@ fi
 
 # MOS custom: update Frontend
 mos_update_frontend() {
+  # Set curl Header
+  GH_TOKEN=$(jq -r '.github // empty' /boot/config/system/tokens.json)
+  if [ ! -z "$GH_TOKEN" ] ; then
+    TOKEN="$(decrypt_password "$GH_TOKEN" "tokens")"
+    HEADER=(--header "Authorization: Bearer $TOKEN")
+  else
+    HEADER=()
+  fi
+
   # Get Asset ID
-  TOKEN="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"
   FRONTEND_JSON=$(curl -s --request GET \
     --url "https://api.github.com/repos/ich777/mos-frontend/releases/latest" \
-    --header "Authorization: Bearer $TOKEN" \
+    "${HEADER[@]}" \
     --header "X-GitHub-Api-Version: 2022-11-28")
   FRONTEND_V=$(echo $FRONTEND_JSON | jq -r '.tag_name')
   FRONTEND_ASSET_ID=$(echo $FRONTEND_JSON | jq -r '.assets[] | select(.name | startswith("mos-frontend") and endswith(".tar.gz")) | .id')
