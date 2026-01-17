@@ -218,8 +218,8 @@ start_vm() {
   fi
 }
 
-# Start SAMBA network discovery services if enabled (SAMBA Discovery)
-start_samba_discovery() {
+# Start SAMBA service if enabled
+start_samba() {
   SAMBA_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.samba.enabled')
   if [ "$SAMBA_ENABLED" = "true" ] ; then
     SAMBA_DISCOVERY_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.samba_discovery.enabled')
@@ -227,13 +227,6 @@ start_samba_discovery() {
       /etc/init.d/nmbd start
       /etc/init.d/wsddn start
     fi
-  fi
-}
-
-# Start SAMBA service if enabled
-start_samba() {
-  SAMBA_ENABLED=$(echo $NETWORK_JSON | jq -r '.services.samba.enabled')
-  if [ "$SAMBA_ENABLED" = "true" ] ; then
     /etc/init.d/smbd start
   fi
 }
@@ -460,7 +453,6 @@ if [ "$1" = "os" ] ; then
   start_swap
   optional_packages
   start_nut
-  start_samba_discovery
   start_samba
   start_nfs
   start_docker
@@ -484,8 +476,6 @@ elif [ "$1" = "lxc" ] ; then
   start_lxc
 elif [ "$1" = "vm" ] ; then
   start_vm
-elif [ "$1" = "samba_discovery" ] ; then
-  start_samba_discovery
 elif [ "$1" = "samba" ] ; then
   start_samba
 elif [ "$1" = "tailscale" ] ; then
