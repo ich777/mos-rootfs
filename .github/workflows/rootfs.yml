@@ -218,6 +218,19 @@ jobs:
         DOCKERWD_DEB=$(echo $DOCKERWD_JSON | jq --arg version v${DOCKERWD_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-docker-watchdog") and endswith(".deb")) | .id')
         DOCKERWD_DEB_MD5=$(echo $DOCKERWD_JSON | jq --arg version v${DOCKERWD_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-docker-watchdog") and endswith(".deb.md5")) | .id')
 
+        # Get docker-watchdog Releases
+        WSDDN_JSON=$(curl -s --request GET \
+            --url "https://api.github.com/repos/ich777/mos-wsddn/releases?per_page=50" \
+            --header "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            --header "X-GitHub-Api-Version: 2022-11-28")
+
+        # Define DOCKERWD_VERSION
+        WSDDN_VERSION=$(echo $WSDDN_JSON | jq -r '.[].tag_name' | sort -V | tail -1)
+
+        # Get Asset IDs
+        WSDDN_DEB=$(echo $WSDDN_JSON | jq --arg version v${WSDDN_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-wsdd-native") and endswith(".deb")) | .id')
+        WSDDN_DEB_MD5=$(echo $WSDDN_JSON | jq --arg version v${WSDDN_VERSION#v} -r '.[] | select(.tag_name == $version) | .assets[] | select(.name | startswith("mos-wsdd-native") and endswith(".deb.md5")) | .id')
+
         # Download applications
         application_download "docker" "${DOCKER_VERSION#v}" "$DOCKER_DEB"
         application_download "docker" "${DOCKER_VERSION#v}" "$DOCKER_DEB_MD5" ".md5"
@@ -235,6 +248,8 @@ jobs:
         application_download "notify" "${NOTIFY_VERSION#v}" "$NOTIFY_DEB_MD5" ".md5"
         application_download "docker-watchdog" "${DOCKERWD_VERSION#v}" "$DOCKERWD_DEB"
         application_download "docker-watchdog" "${DOCKERWD_VERSION#v}" "$DOCKERWD_DEB_MD5" ".md5"
+        application_download "wsddn" "${WSDDN_VERSION#v}" "$WSDDN_DEB"
+        application_download "wsddn" "${WSDDN_VERSION#v}" "$WSDDN_DEB_MD5" ".md5"
 
     - name: Modify rootfs
       run: |
