@@ -18,9 +18,9 @@ NAME="mos-notify"
 USER="root"
 
 if [ "$DEBUG" = "true" ] ; then
-  DEBUG_ARGS=(--output /var/log/notify)
+  DEBUG_ARG="--output /var/log/notify"
 else
-  DEBUG_ARGS=()
+  DEBUG_ARG=""
 fi
 
 PID="/run/mos-notify.pid"
@@ -30,7 +30,7 @@ PID="/run/mos-notify.pid"
 
 start_notify() {
   start-stop-daemon --start --background --make-pidfile --pidfile $PID \
-    --user $USER --exec "$DAEMON" "${DEBUG_ARGS[@]}" -- $ARGS >/dev/null 2>&1
+    --user $USER --exec "$DAEMON" $DEBUG_ARG -- $ARGS >/dev/null 2>&1
 }
 
 stop_notify() {
