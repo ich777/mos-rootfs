@@ -90,6 +90,13 @@ start_nginx() {
   start-stop-daemon --start --quiet --pidfile $PID --exec $DAEMON --test > /dev/null || return 1
   start-stop-daemon --start --quiet --pidfile $PID --exec $DAEMON -- \
     $DAEMON_OPTS 2>/dev/null || return 2
+
+  # MOS Custom: bind mount os_icons directory
+  [ ! -d /var/www/os_icons ] && \
+    mkdir -p /var/www/os_icons
+
+  mount --bind /var/lib/os_icons /var/www/os_icons 2>/dev/null
+  chmod -R 777 /var/lib/os_icons
 }
 
 test_config() {
@@ -107,6 +114,8 @@ stop_nginx() {
   #   other if a failure occurred
   start-stop-daemon --stop --quiet --retry=$STOP_SCHEDULE --pidfile $PID --name $NAME
   RETVAL="$?"
+  # MOS Custom: umount os_icons directory
+  umount -f /var/www/os_icons 2>/dev/null
   sleep 1
   return "$RETVAL"
 }
