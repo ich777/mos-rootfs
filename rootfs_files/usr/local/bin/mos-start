@@ -428,6 +428,12 @@ start_zram() {
   fi
 }
 
+# chmod /dev/dri if exists
+chmod_dri() {
+  [ -d /dev/dri ] && \
+    chmod -R 777 /dev/dri
+}
+
 # Define argument conditions
 if [ "$1" = "os" ] ; then
   STARTUP_SOUND=$(echo $SYSTEM_JSON | jq -r '.notification_sound.startup')
