@@ -457,6 +457,7 @@ if [ "$1" = "os" ] ; then
   start_iscsi_target
   mount_remotes
   start_swap
+  chmod_dri
   optional_packages
   start_nut
   start_samba
