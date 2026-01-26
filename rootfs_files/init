@@ -116,8 +116,8 @@ fi
 if [ -f /boot/optional/scripts/boot.sh ] ; then
   /bin/cp /boot/optional/scripts/boot.sh /tmp/boot.sh
   /bin/chmod +x /tmp/boot.sh
-  /tmp/script.sh
-  /bin/rm /tmp/script.sh
+  /tmp/boot.sh
+  /bin/rm /tmp/boot.sh
 fi
 
 # Create directories
