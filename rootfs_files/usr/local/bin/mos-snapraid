@@ -99,9 +99,40 @@ done
     hdparm -y $(realpath /dev/disk/by-uuid/$parity)
   done
 
-  # Send end notification and remove socket
-  notify -t "SnapRAID" -m "SnapRAID operation $2 for Pool: $1 completed" -p "normal"
+  # Make sure to write results file when check is issued
+  if [ "$2" == "check" ] ; then
+    # Check if results file is present
+    if [ ! -f /boot/config/snapraid/$1.results ] ; then
+      echo "{}" > /boot/config/snapraid/$1.results
+    fi
+    # Get results from current run
+    ERRORS=$(cat /var/log/snapraid/$1 | awk -F: '/summary:error:/{print $3}')
+    ERRORS_UNRECOVERABLE=$(cat /var/log/snapraid/$1 | awk -F: '/summary:error_unrecoverable:/{print $3}')
+    STATUS=$(cat /var/log/snapraid/$1 | awk -F: '/msg:status:/{print $3}' | sed 's/^ //')
+    DATE=$(date '+%Y-%m-%d %H:%M:%S')
+    # Inject result into results file
+    jq --arg errors "$ERRORS" \
+       --arg errors_unrecoverable "$ERRORS_UNRECOVERABLE" \
+       --arg status "$STATUS" \
+       --arg date "$DATE" \
+       '. + {
+         errors: ($errors | tonumber),
+         errors_unrecoverable: ($errors_unrecoverable | tonumber),
+         status: $status,
+         time: ($date)
+       }' "/boot/config/snapraid/$1.results" > /tmp/$1.results && mv /tmp/$1.results /boot/config/snapraid/$1.results
+    # Send notification depending on result
+    if [ "$ERRORS" -ne 0 ] || [ "$ERRORS_UNRECOVERABLE" -ne 0 ] ; then
+      notify -t "SnapRAID" -m "SnapRAID operation $2 for Pool: $1 completed with errors, please check your logs" -p "alert"
+    else
+      notify -t "SnapRAID" -m "SnapRAID operation $2 for Pool: $1 completed, $STATUS" -p "normal"
+    fi
+  else
+    # Send end notification for other operations than check
+    notify -t "SnapRAID" -m "SnapRAID operation $2 for Pool: $1 completed" -p "normal"
+  fi
 
+  # Remove socket file
   rm -f /run/snapraid/$1.socket
 } >/dev/null 2>&1 &
 
