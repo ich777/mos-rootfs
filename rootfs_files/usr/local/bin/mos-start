@@ -336,7 +336,7 @@ mos_hub_update() {
 md5_check_result() {
   if [ -f /var/mos/badfiles ] ; then
     BAD_FILES=$(paste -sd',' /var/mos/badfiles | sed 's/,/, /g')
-    notify -t "Boot MD5 Error" -m "Boot MD5 check finished with error(s) on file(s): $BAD_FILES! \nPlease check your installation!" -p alert
+    /usr/local/bin/notify -t "Boot MD5 Error" -m "Boot MD5 check finished with error(s) on file(s): $BAD_FILES! \nPlease check your installation!" -p "alert"
     rm -f /var/mos/badfiles
   fi
 }
