@@ -261,6 +261,10 @@ jobs:
         ROOTFS=$WORKDIR/rootfs
         mkdir -p $WORKDIR/release
 
+        # Add Memtest86+ License
+        mkdir -p $ROOTFS/usr/share/doc/memtest86plus
+        wget -q -O $ROOTFS/usr/share/doc/memtest86plus/LICENSE https://raw.githubusercontent.com/memtest86plus/memtest86plus/refs/heads/main/LICENSE
+
         cd $ROOTFS
         rm -rf $ROOTFS/root/.* $ROOTFS/var/log/* $ROOTFS/root/* $ROOTFS/tmp/* $ROOTFS/tmp/.* $ROOTFS/var/lib/apt/lists/* $ROOTFS/etc/init.d/.* $ROOTFS/etc/resolv.conf $ROOTFS/var/cache/apt/* $ROOTFS/var/cache/apt/.*
 
