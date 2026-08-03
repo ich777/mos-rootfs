@@ -37,17 +37,17 @@ UPSD_OPTIONS=""
 [ -x "$upsd" ] || exit 0
 
 # MOS Custom: remove existing deprecated config files
-[ -f "/boot/config/system/nut/nut.conf"] \
+[ -f "/boot/config/system/nut/nut.conf" ] \
   && rm -f /boot/config/system/nut/nut.conf
-[ -f "/boot/config/system/nut/ups.conf"] \
+[ -f "/boot/config/system/nut/ups.conf" ] \
   && rm -f /boot/config/system/nut/ups.conf
-[ -f "/boot/config/system/nut/upsd.conf"] \
+[ -f "/boot/config/system/nut/upsd.conf" ] \
   && rm -f /boot/config/system/nut/upsd.conf
-[ -f "/boot/config/system/nut/upsd.users"] \
+[ -f "/boot/config/system/nut/upsd.users" ] \
   && rm -f /boot/config/system/nut/upsd.users
-[ -f "/boot/config/system/nut/upsmon.conf"] \
+[ -f "/boot/config/system/nut/upsmon.conf" ] \
   && rm -f /boot/config/system/nut/upsmon.conf
-[ -f "/boot/config/system/nut/upssched.conf"] \
+[ -f "/boot/config/system/nut/upssched.conf" ] \
   && rm -f /boot/config/system/nut/upssched.conf
 
 # MOS Custom: render /etc/nut files from json
