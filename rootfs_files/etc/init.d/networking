@@ -395,7 +395,7 @@ configure_interfaces() {
   sysctl -wq net.ipv4.ip_forward=1
 
   # Enable or Disable IPv6 globally
-  IPV6=$(echo "$INTERFACES_JSON" | jq -r 'def usable: length > 0 and ((.[0].dhcp == true) or ((.[0].address // "") != "")); [.[] | select(.type != "bridged") | (((.ipv6 // []) | usable) or (((.vlans // []) | map((.ipv6 // []) | usable)) | any))] | any')
+  IPV6=$(echo "$INTERFACES_JSON" | jq -r '[.[] | select(.type != "bridged") | (((.ipv6 // []) | length > 0) or (((.vlans // []) | map((.ipv6 // []) | length > 0)) | any))] | any')
   if [ "${IPV6}" = "false" ] ; then
     disable_ipv6
   else
