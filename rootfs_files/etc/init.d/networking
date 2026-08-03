@@ -135,9 +135,8 @@ ifup_parallel() {
   timeout 60 ifup -a $dhcp_exclusions "$@" || true
 
   # Bring up DHCP interfaces in parallel (console output suppressed, dhclient logs to syslog)
-  # 90s covers one full dhclient solicit window (60s) — anything longer means no server answers
-  for iface in $DHCP_IFACES ; do
-    timeout 90 ifup "$iface" "$@" > /dev/null 2>&1 &
+  for iface in $DHCP_IFACES; do
+    timeout -k 10s 90s ifup "$iface" "$@" > /dev/null 2>&1 &
   done
   wait
 
