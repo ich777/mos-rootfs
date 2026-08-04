@@ -93,6 +93,7 @@ configure_nut() {
   fi
 
   {
+    echo "RUN_AS_USER root"
     jq -r '"MONITOR \(.monitor.upsname // "ups")@\(.monitor.host // "127.0.0.1"):\(.monitor.port // 3493) \(.monitor.powervalue // 1) \(.monitor.username // "") \(.monitor.password // "") \(.monitor.role // "primary")"' "$NUT_JSON"
     jq -r '"MINSUPPLIES \(.shutdown.minsupplies // 1)"' "$NUT_JSON"
     jq -r '"SHUTDOWNCMD \"\(.shutdown.command // "/sbin/shutdown -h +0")\""' "$NUT_JSON"
@@ -110,7 +111,7 @@ configure_nut() {
     done
   } > /etc/nut/upsmon.conf
 
-  printf '#!/bin/sh\nexec /usr/local/bin/mos-api_cli ups:event "$NOTIFYTYPE"\n' > /etc/nut/mos-notify
+  printf '#!/bin/sh\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\nexec mos-api_cli ups:event "$NOTIFYTYPE"\n' > /etc/nut/mos-notify
   chmod +x /etc/nut/mos-notify
 
   if [ "$(jq -r '.shutdown.mode // "lowbattery"' "$NUT_JSON")" = "timer" ] ; then
