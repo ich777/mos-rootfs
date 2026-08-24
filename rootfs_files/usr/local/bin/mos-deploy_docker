@@ -290,12 +290,13 @@ fi
 # Check if this is update/recreate to determine if removal
 # of container and layers is necessary
 if [[ "$UPDATE" = "true" ]] ; then
-  docker pull "$repo"
+  PULL_OUTPUT=$(docker pull "$repo")
   ES=$?
   if [[ "$ES" != "0" ]] ; then
     echo "ERROR: Can't pull new image"
     exit 1
   fi
+  sha256_local=$(echo "$PULL_OUTPUT" | grep -oPm1 '^Digest:\s*\Ksha256:[a-f0-9]+')
   docker container stop "$name" >/dev/null 2>&1
   docker container rm "$name" >/dev/null 2>&1
 elif [[ "$RECREATE" = "true" ]] ; then
@@ -316,7 +317,9 @@ fi
 CONTAINERS_FILE=$(cat /var/lib/docker/mos/containers 2>/dev/null)
 
 # Set local and remote SHA for container in containers file
-sha256_local=$(docker image inspect "$repo" --format '{{index .RepoDigests 0}}' | cut -d '@' -f2-)
+if [[ -z "$sha256_local" ]] ; then
+  sha256_local=$(docker image inspect "$repo" --format '{{index .RepoDigests 0}}' | cut -d '@' -f2-)
+fi
 REMOTE_SHA=$(echo "$CONTAINERS_FILE" | jq --arg name "$name" -r '.[] | select(.name == $name) | .remote')
 if [[ -z "$REMOTE_SHA" || "$REMOTE_SHA" = "null" || "$2" = "update_container" ]] ; then
   sha256_remote=$sha256_local
