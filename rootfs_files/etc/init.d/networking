@@ -163,8 +163,6 @@ enable_ipv6() {
   sysctl -wq net.ipv6.conf.default.disable_ipv6=0
   sysctl -wq net.ipv6.conf.lo.disable_ipv6=0
   sysctl -wq net.ipv6.conf.all.forwarding=1
-  sysctl -wq net.ipv6.conf.all.accept_ra=2
-  sysctl -wq net.ipv6.conf.default.accept_ra=2
 }
 
 # MOS custom: Append a line to the interfaces config buffer
@@ -526,6 +524,9 @@ configure_interfaces() {
           interface_config "    autoconf 0"
         fi
         [ -n "$IPV6_DNS" ] && interface_config "    dns-nameservers $IPV6_DNS"
+      else
+        interface_config "iface $INTERFACE inet6 auto"
+        interface_config "    accept_ra 2"
       fi
     fi
 
