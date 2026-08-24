@@ -28,6 +28,9 @@ FRONTEND_HTTPS_ENABLED=$(echo "$SYSTEM_JSON" | jq -r '.webui.https_enabled')
 MOS_HOSTNAME=$(echo "$SYSTEM_JSON" | jq -r '.hostname // empty')
 LOCAL_DNS_SEARCHNAME=$(echo "$SYSTEM_JSON" | jq -r '.webui.local_dns_searchname // "local"')
 
+# MOS custom: check if IPv6 is enabled
+IPV6="$(cat /boot/config/network.json | jq -r '.interfaces | [.[] | select(.type != "bridged") | (((.ipv6 // []) | length > 0) or (((.vlans // []) | map((.ipv6 // []) | length > 0)) | any))] | any')"
+
 test -x $DAEMON || exit 0
 
 . /lib/init/vars.sh
@@ -159,7 +162,10 @@ start_nginx() {
 
   # Construct http listen block
   if [ -z "$INTERFACES" ] ; then
-    HTTP_BLOCK="    listen                  ${FRONTEND_HTTP_PORT};"
+    HTTP_BLOCK="    listen                  ${FRONTEND_HTTP_PORT};\n"
+    if [ "${IPV6}" = "true" ] ; then
+      HTTP_BLOCK="${HTTP_BLOCK}    listen                  [::]:${FRONTEND_HTTP_PORT};\n"
+    fi
   else
     unset HTTP_BLOCK
     for interface in $INTERFACES ; do
@@ -167,8 +173,14 @@ start_nginx() {
       [ -z "$IP" ] && continue
       HTTP_BLOCK="${HTTP_BLOCK}    listen                  ${IP}:${FRONTEND_HTTP_PORT};\n"
     done
+    if [ -n "$HTTP_BLOCK" ] && [ "${IPV6}" = "true" ] ; then
+      HTTP_BLOCK="${HTTP_BLOCK}    listen                  [::]:${FRONTEND_HTTP_PORT};\n"
+    fi
     if [ -z "$HTTP_BLOCK" ] ; then
-      HTTP_BLOCK="    listen                  ${FRONTEND_HTTP_PORT};"
+      HTTP_BLOCK="    listen                  ${FRONTEND_HTTP_PORT};\n"
+      if [ "${IPV6}" = "true" ] ; then
+        HTTP_BLOCK="${HTTP_BLOCK}    listen                  [::]:${FRONTEND_HTTP_PORT};\n"
+      fi
     fi
   fi
 
@@ -180,9 +192,12 @@ start_nginx() {
     mkdir -p /etc/nginx/ssl 2>/dev/null
     cp /boot/config/system/ssl/nginx.crt /boot/config/system/ssl/nginx.key /etc/nginx/ssl/ 2>/dev/null
     
-    # Construct http listen block
+    # Construct https listen block
     if [ -z "$INTERFACES" ] ; then
       HTTPS_BLOCK="    listen                  ${FRONTEND_HTTPS_PORT} ssl;\n"
+      if [ "${IPV6}" = "true" ] ; then
+        HTTPS_BLOCK="${HTTPS_BLOCK}    listen                  [::]:${FRONTEND_HTTPS_PORT} ssl;\n"
+      fi
     else
       unset HTTPS_BLOCK
       for interface in $INTERFACES ; do
@@ -190,8 +205,14 @@ start_nginx() {
         [ -z "$IP" ] && continue
         HTTPS_BLOCK="${HTTPS_BLOCK}    listen                  ${IP}:${FRONTEND_HTTPS_PORT} ssl;\n"
       done
+      if [ -n "$HTTPS_BLOCK" ] && [ "${IPV6}" = "true" ] ; then
+        HTTPS_BLOCK="${HTTPS_BLOCK}    listen                  [::]:${FRONTEND_HTTPS_PORT} ssl;\n"
+      fi
       if [ -z "$HTTPS_BLOCK" ] ; then
         HTTPS_BLOCK="    listen                  ${FRONTEND_HTTPS_PORT} ssl;\n"
+        if [ "${IPV6}" = "true" ] ; then
+          HTTPS_BLOCK="${HTTPS_BLOCK}    listen                  [::]:${FRONTEND_HTTPS_PORT} ssl;\n"
+        fi
       fi
     fi
     # Add certificates
