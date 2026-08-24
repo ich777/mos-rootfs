@@ -296,7 +296,7 @@ if [[ "$UPDATE" = "true" ]] ; then
     echo "ERROR: Can't pull new image"
     exit 1
   fi
-  echo "$PULL_OUTPUT" | grep -oPm1 '^Digest:\s*\Ksha256:[a-f0-9]+'
+  sha256_local=$(echo "$PULL_OUTPUT" | grep -oPm1 '^Digest:\s*\Ksha256:[a-f0-9]+')
   docker container stop "$name" >/dev/null 2>&1
   docker container rm "$name" >/dev/null 2>&1
 elif [[ "$RECREATE" = "true" ]] ; then
