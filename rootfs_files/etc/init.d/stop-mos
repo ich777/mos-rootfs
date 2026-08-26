@@ -47,6 +47,9 @@ stop_mos() {
 
   shutdown_script
 
+  if [ -f /var/run/rsync.pid ] ; then
+    /etc/init.d/rsync stop
+  fi
   if [ -f /var/run/sshd.pid ] ; then
     /etc/init.d/ssh stop
   fi
