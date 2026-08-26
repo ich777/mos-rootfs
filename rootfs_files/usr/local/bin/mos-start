@@ -566,6 +566,7 @@ if [ "$1" = "os" ] ; then
   start_docker
   start_lxc
   start_vm
+  start_rsyncd
   start_api
   start_nginx
   mos_hub_update
