@@ -290,8 +290,10 @@ fi
 # Check if this is update/recreate to determine if removal
 # of container and layers is necessary
 if [[ "$UPDATE" = "true" ]] ; then
-  PULL_OUTPUT=$(docker pull "$repo")
+  exec 3>&1
+  PULL_OUTPUT=$(set -o pipefail; docker pull "$repo" 2>&1 | tee >(cat >&3))
   ES=$?
+  exec 3>&-
   if [[ "$ES" != "0" ]] ; then
     echo "ERROR: Can't pull new image"
     exit 1
