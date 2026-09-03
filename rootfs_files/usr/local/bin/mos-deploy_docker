@@ -311,6 +311,54 @@ else
   fi
 fi
 
+# Create icon directories
+if [[ ! -d /var/lib/docker/mos/icons ]] ; then
+  mkdir /var/lib/docker/mos/icons
+fi
+if [[ ! -d /var/www/docker_icons ]] ; then
+  mkdir /var/www/docker_icons
+fi
+
+# Download/Update icon depending on mode and if icon is set
+icon=$(echo "$config" | jq -r '.icon // null')
+if [[ "$icon" != "null" && -n "$icon" ]] ; then
+  if [[ "$UPDATE" != "true" && "$RECREATE" != "true" ]] ; then
+    wget -q --timeout=10 --tries=2 -O "/var/lib/docker/mos/icons/$name.png" "$icon"
+    ES=$?
+    if [[ "$ES" != 0 ]] ; then
+      rm -f "/var/lib/docker/mos/icons/$name.png"
+    else
+      cp "/var/lib/docker/mos/icons/$name.png" "/var/www/docker_icons/$name.png" 2>/dev/null
+    fi
+  else
+    wget -q --timeout=10 --tries=2 -O "/var/lib/docker/mos/icons/tmp-$name.png" "$icon"
+    ES=$?
+    if [[ "$ES" != 0 ]] ; then
+      rm -f "/var/lib/docker/mos/icons/tmp-$name.png"
+    else
+      mv "/var/lib/docker/mos/icons/tmp-$name.png" "/var/lib/docker/mos/icons/$name.png" 2>/dev/null
+      cp "/var/lib/docker/mos/icons/$name.png" "/var/www/docker_icons/$name.png" 2>/dev/null
+    fi
+  fi
+fi
+
+if [[ ! -d /boot/config/system/docker/templates ]] ; then
+  mkdir -p /boot/config/system/docker/templates
+fi
+
+if [[ "$UPDATE" != "true" ]] ; then
+  if [[ "$(pwd)" != "/boot/config/system/docker/templates" ]] ; then
+    cp "$(pwd)/$1" "/boot/config/system/docker/templates/$name.json" 2>/dev/null
+  fi
+fi
+
+# Create container or exit on error
+if ! "${docker_cmd[@]}" ; then
+  echo "Error creating container: $name"
+  echo -e "\n${docker_cmd[@]}"
+  exit 1
+fi
+
 # Set/get index from container for containers file, try to heal missing/empty/invalid file
 mkdir -p /var/lib/docker/mos 2>/dev/null
 if ! jq -e 'type == "array"' /var/lib/docker/mos/containers >/dev/null 2>&1 ; then
@@ -323,7 +371,8 @@ if [[ -z "$sha256_local" ]] ; then
   sha256_local=$(docker image inspect "$repo" --format '{{index .RepoDigests 0}}' | cut -d '@' -f2-)
 fi
 REMOTE_SHA=$(echo "$CONTAINERS_FILE" | jq --arg name "$name" -r '.[] | select(.name == $name) | .remote')
-if [[ -z "$REMOTE_SHA" || "$REMOTE_SHA" = "null" || "$2" = "update_container" ]] ; then
+PREVIOUS_REPO=$(echo "$CONTAINERS_FILE" | jq --arg name "$name" -r '.[] | select(.name == $name) | .repo')
+if [[ -z "$REMOTE_SHA" || "$REMOTE_SHA" = "null" || "$2" = "update_container" || "$PREVIOUS_REPO" != "$repo" ]] ; then
   sha256_remote=$sha256_local
 else
   sha256_remote=$REMOTE_SHA
@@ -358,64 +407,6 @@ jq --arg name "$name" \
      }]
    end
    ' /var/lib/docker/mos/containers > /var/lib/docker/mos/containers.tmp && [ -s /var/lib/docker/mos/containers.tmp ] && mv /var/lib/docker/mos/containers.tmp /var/lib/docker/mos/containers
-
-# Create icon directories
-if [[ ! -d /var/lib/docker/mos/icons ]] ; then
-  mkdir /var/lib/docker/mos/icons
-fi
-if [[ ! -d /var/www/docker_icons ]] ; then
-  mkdir /var/www/docker_icons
-fi
-
-# Download/Update icon depending on mode and if icon is set
-icon=$(echo "$config" | jq -r '.icon // null')
-if [[ "$icon" != "null" && -n "$icon" ]] ; then
-  if [[ "$UPDATE" != "true" && "$RECREATE" != "true" ]] ; then
-    wget -q -O "/var/lib/docker/mos/icons/$name.png" "$icon"
-    ES=$?
-    if [[ "$ES" != 0 ]] ; then
-      rm -f "/var/lib/docker/mos/icons/$name.png"
-    else
-      cp "/var/lib/docker/mos/icons/$name.png" "/var/www/docker_icons/$name.png" 2>/dev/null
-    fi
-  else
-    wget -q -O "/var/lib/docker/mos/icons/tmp-$name.png" "$icon"
-    ES=$?
-    if [[ "$ES" != 0 ]] ; then
-      rm -f "/var/lib/docker/mos/icons/tmp-$name.png"
-    else
-      mv "/var/lib/docker/mos/icons/tmp-$name.png" "/var/lib/docker/mos/icons/$name.png" 2>/dev/null
-      cp "/var/lib/docker/mos/icons/$name.png" "/var/www/docker_icons/$name.png" 2>/dev/null
-    fi
-  fi
-fi
-
-if [[ ! -d /boot/config/system/docker/templates ]] ; then
-  mkdir -p /boot/config/system/docker/templates
-fi
-
-if [[ "$UPDATE" != "true" ]] ; then
-  if [[ "$(pwd)" != "/boot/config/system/docker/templates" ]] ; then
-    cp "$(pwd)/$1" "/boot/config/system/docker/templates/$name.json" 2>/dev/null
-  fi
-fi
-
-# Create container or exit on error
-if ! "${docker_cmd[@]}" ; then
-  echo "Error creating container: $name"
-  echo -e "\n${docker_cmd[@]}"
-  exit 1
-else
-  # Make sure to set local and remote sha on new container deployment
-  if [[ -z "$sha256_local" && -z "$sha256_remote" ]] ; then
-    sha256_local=$(docker image inspect "$repo" --format '{{index .RepoDigests 0}}' | cut -d '@' -f2-)
-    jq --arg name "$name" \
-       --arg local "$sha256_local" \
-       --arg remote "$sha256_local" \
-       'map(if .name == $name then .local = $local | .remote = $remote else . end)
-       ' /var/lib/docker/mos/containers > /var/lib/docker/mos/containers.tmp && [ -s /var/lib/docker/mos/containers.tmp ] && mv /var/lib/docker/mos/containers.tmp /var/lib/docker/mos/containers
-  fi
-fi
 
 # Display docker command
 echo -e "\n${docker_cmd[@]}"
