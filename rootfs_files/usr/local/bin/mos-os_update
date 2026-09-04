@@ -53,7 +53,6 @@ rollback_mos() {
   fi
 
   rm -rf /boot/rollback
-  notify -t "MOS Update" -m "Rollback done, please reboot" -p "normal"
   exit 0
 }
 
@@ -65,7 +64,7 @@ case "$1" in
   [0-9]*.[0-9]*.[0-9]*)
   ;;
   rollback)
-    rollback_mos
+    rollback_mos "$@"
   ;;
   *)
     echo "Please specify either a valid version latest or rollback"
@@ -334,4 +333,4 @@ if [ "$UPDATE_MICROCODE" = "true" ] ; then
   fi
 fi
 
-notify -t "MOS Update" -m "MOS update done, please reboot" -p "normal"
+exit 0
